@@ -1,5 +1,4 @@
 id,nama,email,password_hash,noTelepon,role,status
-1,Provider Satu,provider@example.com,123456,081234567890,provider,aktif
-2,Receiver Satu,receiver@example.com,123456,089876543210,receiver,aktif
-3,Admin Sistem,admin@example.com,123456,080000000000,admin,aktif
-
+1,Provider Satu,provider@example.com,8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92,081234567890,provider,aktif
+2,Receiver Satu,receiver@example.com,8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92,089876543210,receiver,aktif
+3,Admin Sistem,admin@example.com,8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92,080000000000,admin,aktif

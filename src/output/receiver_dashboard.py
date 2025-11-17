@@ -28,7 +28,8 @@ class ReceiverDashboard(tk.Frame):
         self.content = tk.Frame(self, bg="#F9FAFB")
         self.content.pack(side="right", fill="both", expand=True)
 
-        self.show_dashboard()
+        # Do not call `show_dashboard` here; the frame will be refreshed when
+        # it becomes visible via `MainApp.show_frame` after login.
 
     # Utility
     def clear_content(self):
@@ -39,6 +40,13 @@ class ReceiverDashboard(tk.Frame):
     # DASHBOARD SUMMARY
     # --------------------------
     def show_dashboard(self):
+        # If no user is logged in yet, show a placeholder and return.
+        if not getattr(self.app, "current_user", None):
+            self.clear_content()
+            tk.Label(self.content, text="Silakan login untuk melihat dashboard",
+                     font=("Helvetica", 16), bg="#F9FAFB").pack(pady=40)
+            return
+
         self.clear_content()
 
         tk.Label(self.content, text="Dashboard Receiver",
@@ -106,6 +114,10 @@ class ReceiverDashboard(tk.Frame):
         row = self.table.item(selected[0])["values"]
         idDonasi = row[0]
 
+        if not getattr(self.app, "current_user", None):
+            messagebox.showerror("Error", "Anda harus login sebagai receiver terlebih dahulu.")
+            return
+
         result = RequestController.buatRequest(idDonasi, self.app.current_user.id)
 
         if result["status"] == "SUCCESS":
@@ -134,6 +146,12 @@ class ReceiverDashboard(tk.Frame):
             table.column(c, width=160)
 
         table.pack()
+
+        # If no user logged in, show placeholder
+        if not getattr(self.app, "current_user", None):
+            tk.Label(self.content, text="Silakan login untuk melihat request Anda",
+                     font=("Helvetica", 14), bg="#F9FAFB").pack(pady=20)
+            return
 
         all_req = RequestController.semuaRequest()
 

@@ -1,58 +1,161 @@
-# src/repository/pengguna_repo.py
-from typing import Optional, List, Dict
-from .csv_manager import CSVManager
-import os
+# src/backend/user_data.py
 
-BASE_DIR = os.path.join(os.getcwd(), "data")
+import os
+import csv
+from typing import List, Dict, Optional
+
+# ========================
+#  CSV Manager (SAFE)
+# ========================
+
+class CSVManager:
+    def __init__(self, filepath: str, header: List[str]):
+        self.filepath = filepath
+        self.header = header
+
+        # Pastikan folder data ada
+        base_folder = os.path.dirname(filepath)
+        if not os.path.exists(base_folder):
+            os.makedirs(base_folder)
+
+        # Jika CSV tidak ada → buat baru
+        if not os.path.exists(filepath):
+            with open(filepath, "w", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f)
+                writer.writerow(header)
+
+    def read_all(self) -> List[List[str]]:
+        try:
+            with open(self.filepath, "r", newline="", encoding="utf-8") as f:
+                reader = csv.reader(f)
+                return list(reader)
+        except Exception as e:
+            print("CSV READ ERROR:", e)
+            return []
+
+    def write_all(self, rows: List[List[str]]):
+        with open(self.filepath, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerows(rows)
+
+    def append_row(self, row: List[str]):
+        with open(self.filepath, "a", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(row)
+
+    def next_id(self) -> int:
+        rows = self.read_all()
+        try:
+            last = int(rows[-1][0])
+            return last + 1
+        except:
+            return 1
+
+
+# =======================================
+#   SAFE PATH → Tidak Tergantung cwd
+# =======================================
+
+# __file__ = .../src/backend/user_data.py
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))  # naik 3 folder
+BASE_DIR = os.path.join(ROOT, "data")
 USERS_CSV = os.path.join(BASE_DIR, "users.csv")
 
-_user_header = ["id","nama","email","password_hash","noTelepon","role","status"]
+_user_header = ["id", "nama", "email", "password_hash",
+                "noTelepon", "role", "status"]
 
-class User:
+
+# =========================
+#  USER REPOSITORY (SAFE)
+# =========================
+
+class UserRepo:
     def __init__(self, path: str = USERS_CSV):
         self._mgr = CSVManager(path, _user_header)
 
+    # ------ Baca semua user ------
     def all(self) -> List[Dict]:
         rows = self._mgr.read_all()
-        res = []
-        for r in rows[1:]:
-            res.append({
-                "id": int(r[0]),
-                "nama": r[1],
-                "email": r[2],
-                "password_hash": r[3],
-                "noTelepon": r[4],
-                "role": r[5],
-                "status": r[6]
-            })
-        return res
+        users = []
 
+        # Debug opsional
+        # print("DEBUG RAW CSV:", rows)
+
+        for r in rows[1:]:  # skip header
+
+            # Skip row kosong atau kurang kolom
+            if not r or len(r) < 7:
+                continue
+
+            # Trim semua whitespace
+            r = [col.strip() for col in r]
+
+            try:
+                users.append({
+                    "id": int(r[0]),
+                    "nama": r[1],
+                    "email": r[2],
+                    "password_hash": r[3],
+                    "noTelepon": r[4],
+                    "role": r[5],
+                    "status": r[6]
+                })
+            except Exception as e:
+                print("SKIP BAD ROW:", r, "ERROR:", e)
+                continue
+
+        return users
+
+    # ------ Cari berdasarkan email ------
     def find_by_email(self, email: str) -> Optional[Dict]:
+        email = email.strip().lower()
+
         for u in self.all():
-            if u["email"].lower() == email.lower():
+            if u["email"].lower() == email:
                 return u
         return None
 
+    # ------ Cari berdasarkan id ------
     def find_by_id(self, uid: int) -> Optional[Dict]:
         for u in self.all():
             if u["id"] == uid:
                 return u
         return None
 
-    def next_id(self) -> int:
-        return self._mgr.next_id()
-
+    # ------ Insert user baru ------
     def save(self, user: Dict):
-        row = [user["id"], user["nama"], user["email"], user["password_hash"], user.get("noTelepon",""), user.get("role","receiver"), user.get("status","aktif")]
+        row = [
+            user["id"],
+            user["nama"],
+            user["email"],
+            user["password_hash"],
+            user.get("noTelepon", ""),
+            user.get("role", "receiver"),
+            user.get("status", "aktif"),
+        ]
         self._mgr.append_row(row)
 
+    # ------ Update user ------
     def update(self, user: Dict):
         rows = self._mgr.read_all()
         header = rows[0]
         new = [header]
+
         for r in rows[1:]:
+            if len(r) < 7:
+                continue
+
             if int(r[0]) == int(user["id"]):
-                new.append([user["id"], user["nama"], user["email"], user["password_hash"], user.get("noTelepon",""), user.get("role","receiver"), user.get("status","aktif")])
+                new.append([
+                    user["id"],
+                    user["nama"],
+                    user["email"],
+                    user["password_hash"],
+                    user.get("noTelepon", ""),
+                    user.get("role", "receiver"),
+                    user.get("status", "aktif")
+                ])
             else:
                 new.append(r)
+
         self._mgr.write_all(new)

@@ -1,9 +1,9 @@
 import hashlib
 from typing import Dict
 from src.model.user import Pengguna
-from src.backend.user_data import User
+from src.backend.user_data import UserRepo
 
-repo = User()
+repo = UserRepo()
 
 def hash_password(pw: str) -> str:
     return hashlib.sha256(pw.encode("utf-8")).hexdigest()

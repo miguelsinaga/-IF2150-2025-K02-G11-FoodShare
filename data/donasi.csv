@@ -1,1 +1,3 @@
 idDonasi,idProvider,jenisMakanan,jumlahPorsi,lokasi,batasWaktu,status,tanggal_donasi
+1,1,Nasi,5,Jakarta,2025-12-01,Tersedia,2025-11-17T20:04:39.257676
+2,2,Nasi Goreng,10,Bandung,2025-12-12,Dipesan,2025-11-17T20:36:49.998950

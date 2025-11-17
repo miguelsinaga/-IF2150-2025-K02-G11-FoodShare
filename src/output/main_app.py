@@ -42,6 +42,15 @@ class MainApp(tk.Tk):
     def show_frame(self, page_name: str):
         frame = self.frames[page_name]
         frame.tkraise()
+        # If the frame provides a dashboard refresh method, call it now.
+        # This avoids accessing `self.current_user` during app initialization
+        # when frames are constructed before login.
+        if hasattr(frame, "show_dashboard"):
+            try:
+                frame.show_dashboard()
+            except Exception:
+                # Ignore errors here — the frame will handle missing current_user.
+                pass
 
     def login_success(self, user):
         self.current_user = user

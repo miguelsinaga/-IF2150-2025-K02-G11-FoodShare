@@ -27,8 +27,9 @@ class ProviderDashboard(tk.Frame):
         self.content = tk.Frame(self, bg="#F9FAFB")
         self.content.pack(side="right", fill="both", expand=True)
 
-        # Load default view
-        self.show_dashboard()
+        # Do not call `show_dashboard` here — pages are constructed before
+        # login and `self.app.current_user` may be None. The frame will be
+        # refreshed by `MainApp.show_frame` when it becomes visible.
 
     # --------------------------
     #   Page Switcher
@@ -41,6 +42,13 @@ class ProviderDashboard(tk.Frame):
     #   DASHBOARD PAGE
     # --------------------------
     def show_dashboard(self):
+        # If no user is logged in yet, show a placeholder.
+        if not getattr(self.app, "current_user", None):
+            self.clear_content()
+            tk.Label(self.content, text="Silakan login untuk melihat dashboard",
+                     font=("Helvetica", 16), bg="#F9FAFB").pack(pady=40)
+            return
+
         self.clear_content()
 
         tk.Label(self.content, text="Dashboard Provider",
@@ -102,6 +110,10 @@ class ProviderDashboard(tk.Frame):
             "batasWaktu": self.inputs["Batas Waktu (YYYY-MM-DD)"].get(),
         }
 
+        if not getattr(self.app, "current_user", None):
+            messagebox.showerror("Error", "Anda harus login sebagai provider terlebih dahulu.")
+            return
+
         result = DonasiController.buatDonasi(self.app.current_user.id, data)
 
         if result["status"] == "SUCCESS":
@@ -131,6 +143,12 @@ class ProviderDashboard(tk.Frame):
             self.table.column(c, width=150)
 
         self.table.pack()
+
+        # If no user is logged in, show placeholder
+        if not getattr(self.app, "current_user", None):
+            tk.Label(self.content, text="Silakan login untuk melihat daftar donasi",
+                     font=("Helvetica", 14), bg="#F9FAFB").pack(pady=20)
+            return
 
         # Load provider's data
         all_donasi = DonasiController.getDonasiAktif()

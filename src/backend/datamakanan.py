@@ -3,7 +3,9 @@ from typing import List, Dict, Optional
 from .csv_manager import CSVManager
 import os
 
-BASE_DIR = os.path.join(os.getcwd(), "data")
+# Use project-root-relative safe data path
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+BASE_DIR = os.path.join(ROOT, "data")
 DONASI_CSV = os.path.join(BASE_DIR, "donasi.csv")
 
 _header = ["idDonasi","idProvider","jenisMakanan","jumlahPorsi","lokasi","batasWaktu","status","tanggal_donasi"]

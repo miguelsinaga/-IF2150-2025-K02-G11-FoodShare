@@ -1,9 +1,9 @@
 # src/model/pengguna.py
 from dataclasses import dataclass
 from typing import Optional
-from src.backend.user_data import User
+from src.backend.user_data import UserRepo
 
-repo = User()
+repo = UserRepo()
 
 @dataclass
 class Pengguna:
@@ -62,15 +62,3 @@ class Pengguna:
             "role": self.role,
             "status": self.status
         })
-
-class Admin(Pengguna):
-    pass
-
-
-class Provider(Pengguna):
-    """Provider punya behavior tambahan bila mau ditambah nanti"""
-    pass
-
-class Receiver(Pengguna):
-    """Receiver bisa punya method tambahan"""
-    pass
