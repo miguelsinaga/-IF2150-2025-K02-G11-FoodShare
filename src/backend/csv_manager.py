@@ -1,40 +1,27 @@
+# src/backend/csv_manager.py
 import csv
 import os
-from typing import List
 
 class CSVManager:
-    def __init__(self, path: str, header: List[str]):
-        self.path = path
+    def __init__(self, filepath, header):
+        self.filepath = filepath
         self.header = header
-        self._ensure_file()
-
-    def _ensure_file(self):
-        os.makedirs(os.path.dirname(self.path), exist_ok=True)
-        if not os.path.exists(self.path):
-            with open(self.path, "w", newline='', encoding='utf-8') as f:
+        if not os.path.exists(filepath):
+            with open(filepath, "w", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
-                writer.writerow(self.header)
+                writer.writerow(header)
 
-    def read_all(self) -> List[List[str]]:
-        with open(self.path, newline='', encoding='utf-8') as f:
-            return list(csv.reader(f))
+    def read_all(self):
+        with open(self.filepath, "r", newline="", encoding="utf-8") as f:
+            reader = csv.reader(f)
+            return list(reader)
 
-    def write_all(self, rows: List[List[str]]):
-        with open(self.path, "w", newline='', encoding='utf-8') as f:
+    def write_all(self, rows):
+        with open(self.filepath, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerows(rows)
 
-    def append_row(self, row: List[str]):
-        with open(self.path, "a", newline='', encoding='utf-8') as f:
+    def append_row(self, row):
+        with open(self.filepath, "a", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(row)
-
-    def next_id(self) -> int:
-        rows = self.read_all()
-        if len(rows) <= 1:
-            return 1
-        last_id = rows[-1][0]
-        try:
-            return int(last_id) + 1
-        except:
-            return len(rows)
