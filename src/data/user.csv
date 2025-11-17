@@ -1,0 +1,4 @@
+id,nama,email,password_hash,noTelepon,role,status
+1,Provider Satu,provider@example.com,123456,081234567890,provider,aktif
+2,Receiver Satu,receiver@example.com,123456,089876543210,receiver,aktif
+3,Admin Sistem,admin@example.com,123456,080000000000,admin,aktif
