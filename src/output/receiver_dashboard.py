@@ -1,162 +1,189 @@
-# src/view/receiver_dashboard.py
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import messagebox
+import customtkinter as ctk
 
-from src.output.components.side_menu import SideMenu
+from src.output.side_menu import SideMenu
 from src.controller.donasi_controller import DonasiController
 from src.controller.request_controller import RequestController
+from src.model.feedbackdonasi import Feedback
 
-
-class ReceiverDashboard(tk.Frame):
+class ReceiverDashboard(ctk.CTkFrame):
     def __init__(self, parent, app):
-        super().__init__(parent, bg="#E5E7EB")
+        super().__init__(parent, fg_color="#F6F6F6")
         self.app = app
-        
-        # LEFT MENU
-        self.side = SideMenu(
-            parent=self,
-            app=app,
-            menu_items=[
-                ("Dashboard", self.show_dashboard),
-                ("Donasi Tersedia", self.show_available_donations),
-                ("Request Saya", self.show_my_requests),
-            ]
-        )
-        self.side.pack(side="left", fill="y")
+        self.current_menu = "Dashboard"
 
-        # MAIN CONTENT AREA
-        self.content = tk.Frame(self, bg="#F9FAFB")
-        self.content.pack(side="right", fill="both", expand=True)
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
 
-        # Do not call `show_dashboard` here; the frame will be refreshed when
-        # it becomes visible via `MainApp.show_frame` after login.
+        self.sidebar_frame = None
+        self.content_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.content_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
 
-    # Utility
-    def clear_content(self):
-        for w in self.content.winfo_children():
-            w.destroy()
-
-    # --------------------------
-    # DASHBOARD SUMMARY
-    # --------------------------
     def show_dashboard(self):
-        # If no user is logged in yet, show a placeholder and return.
-        if not getattr(self.app, "current_user", None):
-            self.clear_content()
-            tk.Label(self.content, text="Silakan login untuk melihat dashboard",
-                     font=("Helvetica", 16), bg="#F9FAFB").pack(pady=40)
-            return
+        self.show_dashboard_ui()
 
-        self.clear_content()
+    def show_dashboard_ui(self):
+        if not getattr(self.app, "current_user", None): return
 
-        tk.Label(self.content, text="Dashboard Receiver",
-                 font=("Helvetica", 24, "bold"),
-                 bg="#F9FAFB").pack(pady=20)
+        if self.sidebar_frame: self.sidebar_frame.destroy()
+        self.sidebar_frame = SideMenu(
+            self, 
+            self.app, 
+            menu_items=[
+                ("Dashboard", lambda: self.switch_menu("Dashboard")),
+                ("Available Food", lambda: self.switch_menu("Available Food")),
+                ("My Requests", lambda: self.switch_menu("My Requests")),
+                ("Feedback", lambda: self.switch_menu("Feedback")),
+            ],
+            active_item=self.current_menu
+        )
+        self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
 
-        # Count data
-        all_requests = RequestController.semuaRequest()
-        my_requests = [
-            r for r in all_requests 
-            if str(r.idReceiver) == str(self.app.current_user.id)
-        ]
+        for widget in self.content_frame.winfo_children(): widget.destroy()
 
-        card = tk.Frame(self.content, bg="white", padx=30, pady=30)
-        card.pack(pady=40)
+        if self.current_menu == "Dashboard": self.render_overview()
+        elif self.current_menu == "Available Food": self.render_available_food()
+        elif self.current_menu == "My Requests": self.render_my_requests()
+        elif self.current_menu == "Feedback": self.render_feedback()
 
-        tk.Label(card, text="Total Request Anda",
-                 font=("Helvetica", 18, "bold"), bg="white").pack()
+    def switch_menu(self, menu_name):
+        self.current_menu = menu_name
+        self.show_dashboard_ui()
 
-        tk.Label(card, text=len(my_requests),
-                 font=("Helvetica", 28, "bold"), fg="#2563EB", bg="white").pack(pady=10)
+    # ============================================
+    # 1. OVERVIEW
+    # ============================================
+    def render_overview(self):
+        user = self.app.current_user
+        ctk.CTkLabel(self.content_frame, text=f"Hi, {user.nama}!", font=("Arial", 24, "bold"), text_color="#132A13").pack(anchor="w")
+        ctk.CTkLabel(self.content_frame, text="Here's your FoodShare summary today.", text_color="gray").pack(anchor="w", pady=(0, 20))
 
-    # --------------------------
-    #  DONASI TERSEDIA
-    # --------------------------
-    def show_available_donations(self):
-        self.clear_content()
+        # Cards
+        stats = ctk.CTkFrame(self.content_frame, fg_color="transparent")
+        stats.pack(fill="x")
 
-        tk.Label(self.content, text="Donasi Tersedia",
-                 font=("Helvetica", 24, "bold"), bg="#F9FAFB").pack(pady=20)
+        donasi_aktif = len(DonasiController.getDonasiAktif())
+        my_reqs = [r for r in RequestController.semuaRequest() if str(r.idReceiver) == str(user.id)]
+        
+        self.create_stat_card(stats, "Available Foods", str(donasi_aktif)).pack(side="left", expand=True, fill="x", padx=5)
+        self.create_stat_card(stats, "Active Requests", str(len(my_reqs))).pack(side="left", expand=True, fill="x", padx=5)
+        self.create_stat_card(stats, "Incoming", "0").pack(side="left", expand=True, fill="x", padx=5)
+        self.create_stat_card(stats, "Total Completed", "0").pack(side="left", expand=True, fill="x", padx=5)
 
-        table_frame = tk.Frame(self.content, bg="white")
-        table_frame.pack(pady=20, padx=20)
+    def create_stat_card(self, parent, title, value):
+        card = ctk.CTkFrame(parent, fg_color="#132A13", corner_radius=10)
+        # Icon circle
+        ctk.CTkFrame(card, width=35, height=35, corner_radius=17, fg_color="white").pack(anchor="w", padx=15, pady=15)
+        ctk.CTkLabel(card, text=title, text_color="#A0B0A0", font=("Arial", 12)).pack(anchor="w", padx=15)
+        ctk.CTkLabel(card, text=value, text_color="white", font=("Arial", 28, "bold")).pack(anchor="w", padx=15, pady=(0, 15))
+        return card
 
-        cols = ("ID", "Jenis", "Porsi", "Lokasi", "Batas")
-        self.table = ttk.Treeview(table_frame, columns=cols, show="headings", height=12)
+    # ============================================
+    # 2. AVAILABLE FOOD (GRID CARD)
+    # ============================================
+    def render_available_food(self):
+        ctk.CTkLabel(self.content_frame, text="Available Food", font=("Arial", 24, "bold"), text_color="#132A13").pack(anchor="w")
+        ctk.CTkLabel(self.content_frame, text="Browse and request available donations", text_color="gray").pack(anchor="w", pady=(0, 20))
 
-        for c in cols:
-            self.table.heading(c, text=c)
-            self.table.column(c, width=150)
+        scroll = ctk.CTkScrollableFrame(self.content_frame, fg_color="transparent")
+        scroll.pack(fill="both", expand=True)
 
-        self.table.pack()
+        # Grid Container logic
+        # Kita pakai grid pada scroll frame
+        scroll.grid_columnconfigure(0, weight=1)
+        scroll.grid_columnconfigure(1, weight=1)
+        scroll.grid_columnconfigure(2, weight=1)
 
-        # Load data
-        aktif = DonasiController.getDonasiAktif()
-        for d in aktif:
-            self.table.insert("", "end", values=(
-                d.idDonasi, d.jenisMakanan, d.jumlahPorsi, d.lokasi, d.batasWaktu
-            ))
+        donasi_list = DonasiController.getDonasiAktif()
+        
+        for i, d in enumerate(donasi_list):
+            row = i // 3
+            col = i % 3
+            self.create_food_card(scroll, d).grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
 
-        tk.Button(
-            self.content,
-            text="Request Donasi",
-            bg="#10B981", fg="white",
-            font=("Helvetica", 12, "bold"),
-            command=self.request_selected
-        ).pack(pady=10)
+    def create_food_card(self, parent, donasi):
+        card = ctk.CTkFrame(parent, fg_color="#132A13", corner_radius=15)
+        
+        # Image Placeholder (Kotak Hijau Muda)
+        img_ph = ctk.CTkFrame(card, height=120, fg_color="#C5E064", corner_radius=10)
+        img_ph.pack(fill="x", padx=15, pady=15)
+        
+        ctk.CTkLabel(card, text=donasi.jenisMakanan, font=("Arial", 16, "bold"), text_color="white", anchor="w").pack(fill="x", padx=15)
+        ctk.CTkLabel(card, text=f"Provider #{donasi.idProvider}", font=("Arial", 12), text_color="#A0B0A0", anchor="w").pack(fill="x", padx=15)
+        
+        # Details
+        detail_text = f"Portions: {donasi.jumlahPorsi}\nExpires: {donasi.batasWaktu}\nLoc: {donasi.lokasi}"
+        ctk.CTkLabel(card, text=detail_text, font=("Arial", 12), text_color="white", justify="left", anchor="w").pack(fill="x", padx=15, pady=10)
 
-    def request_selected(self):
-        selected = self.table.selection()
-        if not selected:
-            messagebox.showwarning("Error", "Pilih donasi terlebih dahulu.")
-            return
+        btn = ctk.CTkButton(card, text="Request Food", fg_color="#F6A836", hover_color="#E59930", text_color="white", font=("Arial", 14, "bold"),
+                            command=lambda: self.do_request(donasi.idDonasi))
+        btn.pack(fill="x", padx=15, pady=(0, 20))
+        
+        return card
 
-        row = self.table.item(selected[0])["values"]
-        idDonasi = row[0]
+    def do_request(self, idDonasi):
+        if messagebox.askyesno("Confirm", "Request this food?"):
+            result = RequestController.buatRequest(idDonasi, self.app.current_user.id)
+            if result["status"] == "SUCCESS":
+                messagebox.showinfo("Success", "Request sent!")
+                self.switch_menu("My Requests")
+            else:
+                messagebox.showerror("Error", result["message"])
 
-        if not getattr(self.app, "current_user", None):
-            messagebox.showerror("Error", "Anda harus login sebagai receiver terlebih dahulu.")
-            return
+    # ============================================
+    # 3. MY REQUESTS
+    # ============================================
+    def render_my_requests(self):
+        ctk.CTkLabel(self.content_frame, text="My Requests", font=("Arial", 24, "bold"), text_color="#132A13").pack(anchor="w")
+        
+        scroll = ctk.CTkScrollableFrame(self.content_frame, fg_color="transparent")
+        scroll.pack(fill="both", expand=True, pady=20)
 
-        result = RequestController.buatRequest(idDonasi, self.app.current_user.id)
+        my_reqs = [r for r in RequestController.semuaRequest() if str(r.idReceiver) == str(self.app.current_user.id)]
+        
+        for req in my_reqs:
+            # Horizontal Card
+            card = ctk.CTkFrame(scroll, fg_color="#132A13", corner_radius=10)
+            card.pack(fill="x", pady=10)
+            
+            info_frame = ctk.CTkFrame(card, fg_color="transparent")
+            info_frame.pack(side="left", padx=20, pady=20)
+            
+            ctk.CTkLabel(info_frame, text=f"Request #{req.idRequest}", font=("Arial", 16, "bold"), text_color="#C5E064", anchor="w").pack(fill="x")
+            ctk.CTkLabel(info_frame, text=f"Donation ID: {req.idDonasi}", text_color="white", anchor="w").pack(fill="x")
+            
+            status_frame = ctk.CTkFrame(card, fg_color="transparent")
+            status_frame.pack(side="right", padx=20)
+            
+            # Status Badge
+            s_color = "#FEF9C3" # default yellow
+            s_fg = "#A16207"
+            if req.status == "Pending": 
+                s_text = "Waiting Confirmation"
+            else:
+                s_text = req.status
+                if req.status == "Completed": s_color, s_fg = "#DCFCE7", "#166534"
 
-        if result["status"] == "SUCCESS":
-            messagebox.showinfo("Sukses", "Request berhasil dibuat!")
-            self.show_my_requests()
-        else:
-            messagebox.showerror("Error", result["message"])
+            ctk.CTkLabel(status_frame, text=s_text, fg_color=s_color, text_color=s_fg, corner_radius=10, width=150, height=30).pack()
 
-    # --------------------------
-    #  REQUEST SAYA
-    # --------------------------
-    def show_my_requests(self):
-        self.clear_content()
+    # ============================================
+    # 4. FEEDBACK
+    # ============================================
+    def render_feedback(self):
+        ctk.CTkLabel(self.content_frame, text="Feedback History", font=("Arial", 24, "bold"), text_color="#132A13").pack(anchor="w")
+        
+        scroll = ctk.CTkScrollableFrame(self.content_frame, fg_color="transparent")
+        scroll.pack(fill="both", expand=True, pady=20)
 
-        tk.Label(self.content, text="Request Saya",
-                 font=("Helvetica", 24, "bold"), bg="#F9FAFB").pack(pady=20)
-
-        table_frame = tk.Frame(self.content, bg="white")
-        table_frame.pack(pady=20, padx=20)
-
-        cols = ("ID Request", "ID Donasi", "Status", "Tanggal")
-        table = ttk.Treeview(table_frame, columns=cols, show="headings", height=12)
-
-        for c in cols:
-            table.heading(c, text=c)
-            table.column(c, width=160)
-
-        table.pack()
-
-        # If no user logged in, show placeholder
-        if not getattr(self.app, "current_user", None):
-            tk.Label(self.content, text="Silakan login untuk melihat request Anda",
-                     font=("Helvetica", 14), bg="#F9FAFB").pack(pady=20)
-            return
-
-        all_req = RequestController.semuaRequest()
-
-        for r in all_req:
-            if str(r.idReceiver) == str(self.app.current_user.id):
-                table.insert("", "end", values=(
-                    r.idRequest, r.idDonasi, r.status, r.tanggalRequest
-                ))
+        # Ambil semua feedback (ideally filter by receiver_id if needed, but repo methods limited)
+        # For demo, we show all feedback
+        feedbacks = Feedback.all() 
+        
+        for fb in feedbacks:
+            card = ctk.CTkFrame(scroll, fg_color="white", border_width=1, border_color="#DDD")
+            card.pack(fill="x", pady=10, ipadx=20, ipady=20)
+            
+            ctk.CTkLabel(card, text=f"To Provider #{fb.idProvider}", font=("Arial", 14, "bold"), text_color="#132A13").pack(anchor="w")
+            ctk.CTkLabel(card, text="★"*fb.rating, text_color="#F6A836").pack(anchor="w")
+            ctk.CTkLabel(card, text=fb.komentar, text_color="#555").pack(anchor="w", pady=(5, 0))

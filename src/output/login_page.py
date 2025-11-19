@@ -92,7 +92,7 @@ class LoginPage(ctk.CTkFrame):
         ctk.CTkLabel(self.form_container, text="Login to your account", 
                      font=("Arial", 14), text_color=self.colors["text_sub"]).pack(pady=(0, 40))
 
-        # 2. Input Username
+        # 2. Input Email
         self.email_entry = ctk.CTkEntry(
             self.form_container,
             width=350,
@@ -100,7 +100,7 @@ class LoginPage(ctk.CTkFrame):
             corner_radius=15,                # Sudut melengkung
             fg_color=self.colors["input_bg"],
             text_color=self.colors["input_fg"],
-            placeholder_text="Username",
+            placeholder_text="Email",
             placeholder_text_color=self.colors["placeholder"],
             border_width=0,
             font=("Arial", 14)
