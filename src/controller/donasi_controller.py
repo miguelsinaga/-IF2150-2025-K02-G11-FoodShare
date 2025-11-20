@@ -48,3 +48,21 @@ class DonasiController:
         donasi.update()
 
         return {"status": "SUCCESS", "message": "Donasi berhasil dibatalkan"}
+    
+    @staticmethod
+    def updateDonasi(data: Dict) -> Dict:
+        donasi = DataMakanan.find_by_id(data["idDonasi"])
+        
+        if not donasi:
+            return {"status": "FAIL", "message": "Donasi tidak ditemukan"}
+
+        # Perbarui atribut objek donasi
+        donasi.jenisMakanan = data["jenisMakanan"]
+        donasi.jumlahPorsi = int(data["jumlahPorsi"])
+        donasi.lokasi = data["lokasi"]
+        donasi.batasWaktu = data["batasWaktu"]
+        # Status dan tanggal donasi awal tidak berubah
+
+        donasi.update() # Panggil metode update dari Model
+
+        return {"status": "SUCCESS", "message": "Donasi berhasil diperbarui", "donasi": donasi}
