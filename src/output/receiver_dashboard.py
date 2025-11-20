@@ -59,7 +59,6 @@ class ReceiverDashboard(ctk.CTkFrame):
         ctk.CTkLabel(self.content_frame, text=f"Hi, {user.nama}!", font=("Arial", 24, "bold"), text_color="#132A13").pack(anchor="w")
         ctk.CTkLabel(self.content_frame, text="Here's your FoodShare summary today.", text_color="gray").pack(anchor="w", pady=(0, 20))
 
-        # Cards
         stats = ctk.CTkFrame(self.content_frame, fg_color="transparent")
         stats.pack(fill="x")
 
@@ -73,7 +72,6 @@ class ReceiverDashboard(ctk.CTkFrame):
 
     def create_stat_card(self, parent, title, value):
         card = ctk.CTkFrame(parent, fg_color="#132A13", corner_radius=10)
-        # Icon circle
         ctk.CTkFrame(card, width=35, height=35, corner_radius=17, fg_color="white").pack(anchor="w", padx=15, pady=15)
         ctk.CTkLabel(card, text=title, text_color="#A0B0A0", font=("Arial", 12)).pack(anchor="w", padx=15)
         ctk.CTkLabel(card, text=value, text_color="white", font=("Arial", 28, "bold")).pack(anchor="w", padx=15, pady=(0, 15))
@@ -89,8 +87,6 @@ class ReceiverDashboard(ctk.CTkFrame):
         scroll = ctk.CTkScrollableFrame(self.content_frame, fg_color="transparent")
         scroll.pack(fill="both", expand=True)
 
-        # Grid Container logic
-        # Kita pakai grid pada scroll frame
         scroll.grid_columnconfigure(0, weight=1)
         scroll.grid_columnconfigure(1, weight=1)
         scroll.grid_columnconfigure(2, weight=1)
@@ -103,20 +99,23 @@ class ReceiverDashboard(ctk.CTkFrame):
             self.create_food_card(scroll, d).grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
 
     def create_food_card(self, parent, donasi):
+        # Card background
         card = ctk.CTkFrame(parent, fg_color="#132A13", corner_radius=15)
         
-        # Image Placeholder (Kotak Hijau Muda)
+        # Image Placeholder
         img_ph = ctk.CTkFrame(card, height=120, fg_color="#C5E064", corner_radius=10)
         img_ph.pack(fill="x", padx=15, pady=15)
         
         ctk.CTkLabel(card, text=donasi.jenisMakanan, font=("Arial", 16, "bold"), text_color="white", anchor="w").pack(fill="x", padx=15)
         ctk.CTkLabel(card, text=f"Provider #{donasi.idProvider}", font=("Arial", 12), text_color="#A0B0A0", anchor="w").pack(fill="x", padx=15)
         
-        # Details
         detail_text = f"Portions: {donasi.jumlahPorsi}\nExpires: {donasi.batasWaktu}\nLoc: {donasi.lokasi}"
         ctk.CTkLabel(card, text=detail_text, font=("Arial", 12), text_color="white", justify="left", anchor="w").pack(fill="x", padx=15, pady=10)
 
-        btn = ctk.CTkButton(card, text="Request Food", fg_color="#F6A836", hover_color="#E59930", text_color="white", font=("Arial", 14, "bold"),
+        # Tombol dengan hover effect
+        btn = ctk.CTkButton(card, text="Request Food", fg_color="#F6A836", 
+                            hover_color="#E59930", text_color="white", font=("Arial", 14, "bold"),
+                            cursor="hand2",
                             command=lambda: self.do_request(donasi.idDonasi))
         btn.pack(fill="x", padx=15, pady=(0, 20))
         
@@ -132,7 +131,7 @@ class ReceiverDashboard(ctk.CTkFrame):
                 messagebox.showerror("Error", result["message"])
 
     # ============================================
-    # 3. MY REQUESTS
+    # 3. MY REQUESTS (Tabel / List)
     # ============================================
     def render_my_requests(self):
         ctk.CTkLabel(self.content_frame, text="My Requests", font=("Arial", 24, "bold"), text_color="#132A13").pack(anchor="w")
@@ -143,7 +142,6 @@ class ReceiverDashboard(ctk.CTkFrame):
         my_reqs = [r for r in RequestController.semuaRequest() if str(r.idReceiver) == str(self.app.current_user.id)]
         
         for req in my_reqs:
-            # Horizontal Card
             card = ctk.CTkFrame(scroll, fg_color="#132A13", corner_radius=10)
             card.pack(fill="x", pady=10)
             
@@ -156,11 +154,9 @@ class ReceiverDashboard(ctk.CTkFrame):
             status_frame = ctk.CTkFrame(card, fg_color="transparent")
             status_frame.pack(side="right", padx=20)
             
-            # Status Badge
-            s_color = "#FEF9C3" # default yellow
+            s_color = "#FEF9C3"
             s_fg = "#A16207"
-            if req.status == "Pending": 
-                s_text = "Waiting Confirmation"
+            if req.status == "Pending": s_text = "Waiting Confirmation"
             else:
                 s_text = req.status
                 if req.status == "Completed": s_color, s_fg = "#DCFCE7", "#166534"
@@ -172,14 +168,10 @@ class ReceiverDashboard(ctk.CTkFrame):
     # ============================================
     def render_feedback(self):
         ctk.CTkLabel(self.content_frame, text="Feedback History", font=("Arial", 24, "bold"), text_color="#132A13").pack(anchor="w")
-        
         scroll = ctk.CTkScrollableFrame(self.content_frame, fg_color="transparent")
         scroll.pack(fill="both", expand=True, pady=20)
 
-        # Ambil semua feedback (ideally filter by receiver_id if needed, but repo methods limited)
-        # For demo, we show all feedback
         feedbacks = Feedback.all() 
-        
         for fb in feedbacks:
             card = ctk.CTkFrame(scroll, fg_color="white", border_width=1, border_color="#DDD")
             card.pack(fill="x", pady=10, ipadx=20, ipady=20)

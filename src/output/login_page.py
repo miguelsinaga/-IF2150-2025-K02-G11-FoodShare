@@ -37,14 +37,11 @@ class LoginPage(ctk.CTkFrame):
         # ===========================================================
         # BAGIAN KIRI: Floating White Card
         # ===========================================================
-        # Kartu putih ini tidak menempel penuh ke tepi (ada margin)
-        # corner_radius=30 membuat sudutnya melengkung besar seperti di gambar
         self.left_card = ctk.CTkFrame(
             self, 
             fg_color=self.colors["card_bg"], 
             corner_radius=40 
         )
-        # padx/pady di sini menciptakan efek "mengambang" dari tepi layar
         self.left_card.grid(row=0, column=0, sticky="nsew", padx=(30, 15), pady=30)
         
         # Frame internal untuk menengahkan konten logo
@@ -57,7 +54,7 @@ class LoginPage(ctk.CTkFrame):
             pil_image = Image.open(image_path)
             self.logo_image = ctk.CTkImage(light_image=pil_image, 
                                            dark_image=pil_image, 
-                                           size=(220, 220)) # Ukuran logo diperbesar sedikit
+                                           size=(220, 220)) 
             ctk.CTkLabel(self.left_content, text="", image=self.logo_image).pack(pady=(0, 10))
         else:
             ctk.CTkLabel(self.left_content, text="[LOGO]", font=("Arial", 24)).pack(pady=(0, 10))
@@ -76,12 +73,11 @@ class LoginPage(ctk.CTkFrame):
                      font=("Arial", 20, "bold"), text_color="#A4C639").pack(side="left")
 
         # ===========================================================
-        # BAGIAN KANAN: Form Login (Langsung di atas Background Hijau)
+        # BAGIAN KANAN: Form Login
         # ===========================================================
         self.right_panel = ctk.CTkFrame(self, fg_color="transparent")
         self.right_panel.grid(row=0, column=1, sticky="nsew", padx=(15, 30), pady=30)
 
-        # Container Form
         self.form_container = ctk.CTkFrame(self.right_panel, fg_color="transparent", width=350)
         self.form_container.place(relx=0.5, rely=0.5, anchor="center")
 
@@ -92,15 +88,15 @@ class LoginPage(ctk.CTkFrame):
         ctk.CTkLabel(self.form_container, text="Login to your account", 
                      font=("Arial", 14), text_color=self.colors["text_sub"]).pack(pady=(0, 40))
 
-        # 2. Input Email
+        # 2. Input Username
         self.email_entry = ctk.CTkEntry(
             self.form_container,
             width=350,
-            height=55,                       # Lebih tebal sesuai gambar
-            corner_radius=15,                # Sudut melengkung
+            height=55,
+            corner_radius=15,
             fg_color=self.colors["input_bg"],
             text_color=self.colors["input_fg"],
-            placeholder_text="Email",
+            placeholder_text="Username",
             placeholder_text_color=self.colors["placeholder"],
             border_width=0,
             font=("Arial", 14)
@@ -123,19 +119,23 @@ class LoginPage(ctk.CTkFrame):
         )
         self.password_entry.pack(pady=(0, 10))
 
-        # 4. Forgot Password Link
-        forgot_btn = ctk.CTkButton(
+        # 4. Forgot Password Link (Efek Hover Khusus)
+        self.forgot_btn = ctk.CTkButton(
             self.form_container, 
             text="Forgot Password?", 
             font=("Arial", 12, "bold"),
             fg_color="transparent", 
-            text_color="#132A13",
-            hover=False,
+            text_color="#132A13",          # Warna normal
+            hover_color=self.colors["bg_main"], # Background saat hover (tetap transparan/sama bg)
             anchor="e",
             width=350,
+            cursor="hand2",
             command=lambda: print("Forgot Password clicked")
         )
-        forgot_btn.pack(pady=(0, 25))
+        # Bind events untuk ubah warna teks saat hover
+        self.forgot_btn.bind("<Enter>", lambda e: self.forgot_btn.configure(text_color="#FFB03B"))
+        self.forgot_btn.bind("<Leave>", lambda e: self.forgot_btn.configure(text_color="#132A13"))
+        self.forgot_btn.pack(pady=(0, 25))
 
         # 5. Tombol Login
         self.login_btn = ctk.CTkButton(
@@ -148,28 +148,33 @@ class LoginPage(ctk.CTkFrame):
             fg_color=self.colors["btn_bg"],
             text_color="#132A13",
             hover_color=self.colors["btn_hover"],
+            cursor="hand2",
             command=self.do_login
         )
         self.login_btn.pack(pady=(0, 25))
 
-        # 6. Sign Up Area
+        # 6. Sign Up Area (Efek Hover pada Teks "sign up")
         signup_frame = ctk.CTkFrame(self.form_container, fg_color="transparent")
         signup_frame.pack()
 
         ctk.CTkLabel(signup_frame, text="Don't have an account? ", 
                      font=("Arial", 12), text_color="#556B2F").pack(side="left")
         
-        signup_btn = ctk.CTkButton(
+        self.signup_btn = ctk.CTkButton(
             signup_frame,
             text="sign up",
             font=("Arial", 12, "bold"),
             fg_color="transparent",
             text_color="#132A13",
             width=50,
-            hover=False,
+            hover_color=self.colors["bg_main"], # Hindari kotak hover terlihat
+            cursor="hand2",
             command=lambda: app.show_frame("RegisterPage")
         )
-        signup_btn.pack(side="left")
+        # Bind events manual untuk text color change
+        self.signup_btn.bind("<Enter>", lambda e: self.signup_btn.configure(text_color="#FFB03B"))
+        self.signup_btn.bind("<Leave>", lambda e: self.signup_btn.configure(text_color="#132A13"))
+        self.signup_btn.pack(side="left")
 
     def do_login(self):
         email = self.email_entry.get().strip()

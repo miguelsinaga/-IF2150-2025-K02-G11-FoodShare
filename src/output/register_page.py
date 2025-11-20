@@ -29,12 +29,12 @@ class RegisterPage(ctk.CTkFrame):
         }
 
         # Konfigurasi Grid Utama
-        self.grid_columnconfigure(0, weight=1) # Kiri (Kartu Putih)
-        self.grid_columnconfigure(1, weight=1) # Kanan (Form)
+        self.grid_columnconfigure(0, weight=1) 
+        self.grid_columnconfigure(1, weight=1) 
         self.grid_rowconfigure(0, weight=1)
 
         # ===========================================================
-        # BAGIAN KIRI: Branding (Sama dengan Login)
+        # BAGIAN KIRI
         # ===========================================================
         self.left_card = ctk.CTkFrame(self, fg_color=self.colors["card_bg"], corner_radius=40)
         self.left_card.grid(row=0, column=0, sticky="nsew", padx=(30, 15), pady=30)
@@ -51,11 +51,9 @@ class RegisterPage(ctk.CTkFrame):
         else:
             ctk.CTkLabel(self.left_content, text="[LOGO]", font=("Arial", 24)).pack(pady=(0, 10))
 
-        # Teks Branding
         ctk.CTkLabel(self.left_content, text="FoodShare", 
                      font=("Arial", 36, "bold"), text_color="#E89D30").pack(pady=(0, 15))
 
-        # Slogan
         slogan_frame = ctk.CTkFrame(self.left_content, fg_color="transparent")
         slogan_frame.pack()
         ctk.CTkLabel(slogan_frame, text="Share More, ", font=("Arial", 20, "bold"), text_color="#132A13").pack(side="left")
@@ -70,29 +68,27 @@ class RegisterPage(ctk.CTkFrame):
         self.form_container = ctk.CTkFrame(self.right_panel, fg_color="transparent", width=350)
         self.form_container.place(relx=0.5, rely=0.5, anchor="center")
 
-        # 1. Header
+        # Header
         ctk.CTkLabel(self.form_container, text="Join FoodShare!", 
                      font=("Arial", 28, "bold"), text_color=self.colors["text_header"]).pack(pady=(0, 5))
         
         ctk.CTkLabel(self.form_container, text="Create your account", 
                      font=("Arial", 14), text_color=self.colors["text_sub"]).pack(pady=(0, 25))
 
-        # 2. Input Fields (Username, Email, Phone, Password)
+        # Inputs
         self.nama_entry = self.create_input("Username")
         self.nama_entry.pack(pady=(0, 10))
 
         self.email_entry = self.create_input("Email")
         self.email_entry.pack(pady=(0, 10))
 
-        # Catatan: Saya menambahkan input No Telepon karena Backend Anda membutuhkannya
         self.phone_entry = self.create_input("Phone Number")
         self.phone_entry.pack(pady=(0, 10))
 
         self.pass_entry = self.create_input("Password", is_password=True)
         self.pass_entry.pack(pady=(0, 20))
 
-        # 3. Tombol Register (Dua Pilihan Role)
-        # Tombol Provider
+        # Tombol Register Provider
         self.btn_provider = ctk.CTkButton(
             self.form_container,
             text="Sign Up as Provider",
@@ -102,11 +98,12 @@ class RegisterPage(ctk.CTkFrame):
             fg_color=self.colors["btn_bg"],
             text_color="#132A13",
             hover_color=self.colors["btn_hover"],
+            cursor="hand2",
             command=lambda: self.do_register("provider")
         )
         self.btn_provider.pack(pady=(0, 10))
 
-        # Tombol Receiver
+        # Tombol Register Receiver
         self.btn_receiver = ctk.CTkButton(
             self.form_container,
             text="Sign Up as Receiver",
@@ -116,28 +113,33 @@ class RegisterPage(ctk.CTkFrame):
             fg_color=self.colors["btn_bg"],
             text_color="#132A13",
             hover_color=self.colors["btn_hover"],
+            cursor="hand2",
             command=lambda: self.do_register("receiver")
         )
         self.btn_receiver.pack(pady=(0, 20))
 
-        # 4. Footer Login Link
+        # Footer Login Link (Hover Effect)
         login_frame = ctk.CTkFrame(self.form_container, fg_color="transparent")
         login_frame.pack()
 
         ctk.CTkLabel(login_frame, text="Already have an account? ", 
                      font=("Arial", 12), text_color="#556B2F").pack(side="left")
         
-        btn_login = ctk.CTkButton(
+        self.btn_login = ctk.CTkButton(
             login_frame,
             text="login",
             font=("Arial", 12, "bold"),
             fg_color="transparent",
             text_color="#132A13",
             width=40,
-            hover=False,
+            hover_color=self.colors["bg_main"],
+            cursor="hand2",
             command=lambda: app.show_frame("LoginPage")
         )
-        btn_login.pack(side="left")
+        # Bind events
+        self.btn_login.bind("<Enter>", lambda e: self.btn_login.configure(text_color="#FFB03B"))
+        self.btn_login.bind("<Leave>", lambda e: self.btn_login.configure(text_color="#132A13"))
+        self.btn_login.pack(side="left")
 
     def create_input(self, placeholder, is_password=False):
         return ctk.CTkEntry(
@@ -159,17 +161,15 @@ class RegisterPage(ctk.CTkFrame):
         phone = self.phone_entry.get().strip()
         pw = self.pass_entry.get().strip()
 
-        # Validasi dasar
         if not nama or not email or not pw:
             messagebox.showwarning("Warning", "Mohon lengkapi data (Nama, Email, Password).")
             return
 
-        # Data payload sesuai controller
         data = {
             "nama": nama,
             "email": email,
             "password": pw,
-            "noTelepon": phone if phone else "-", # Default strip jika kosong agar tidak error
+            "noTelepon": phone if phone else "-",
             "role": role
         }
 
@@ -181,5 +181,4 @@ class RegisterPage(ctk.CTkFrame):
             else:
                 messagebox.showerror("Error", result["message"])
         except NameError:
-            # Mode testing UI
             messagebox.showinfo("Test Mode", f"Register Data:\nRole: {role}\nNama: {nama}\nEmail: {email}")

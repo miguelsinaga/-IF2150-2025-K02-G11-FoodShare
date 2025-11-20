@@ -49,15 +49,19 @@ class SideMenu(ctk.CTkFrame):
             fg_color="transparent",
             text_color="#EF4444",
             font=("Arial", 14, "bold"),
-            hover_color="#2D1F1F",
+            hover_color="#2D1F1F",  # Hover gelap kemerahan untuk logout
             anchor="w",
+            cursor="hand2",  # Kursor tangan saat hover
             command=self.logout
         ).pack(fill="x")
 
     def create_menu_btn(self, text, command, is_active):
+        # Logika warna hover dan aktif
         fg_color = "#C5E064" if is_active else "transparent"
         text_color = "#132A13" if is_active else "#A0B0A0"
-        hover_color = "#C5E064" if is_active else "#1F381F"
+        
+        # Hover color: Jika aktif tetap sama, jika tidak aktif jadi hijau gelap sedikit terang
+        hover_color = "#C5E064" if is_active else "#1F381F" 
         
         btn = ctk.CTkButton(
             self,
@@ -69,6 +73,7 @@ class SideMenu(ctk.CTkFrame):
             anchor="w",
             height=45,
             corner_radius=10,
+            cursor="hand2",  # Menambahkan kursor tangan
             command=command
         )
         return btn
