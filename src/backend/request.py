@@ -5,7 +5,7 @@ import os
 
 # Use project-root-relative safe data path
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-BASE_DIR = os.path.join(ROOT, "data")
+BASE_DIR = os.path.join(ROOT, "tests", "data") 
 REQUESTS_CSV = os.path.join(BASE_DIR, "requests.csv")
 
 _header = ["idRequest","idDonasi","idReceiver","status","tanggalRequest"]

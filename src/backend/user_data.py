@@ -57,8 +57,8 @@ class CSVManager:
 # =======================================
 
 # __file__ = .../src/backend/user_data.py
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))  # naik 3 folder
-BASE_DIR = os.path.join(ROOT, "data")
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+BASE_DIR = os.path.join(ROOT, "tests", "data") 
 USERS_CSV = os.path.join(BASE_DIR, "users.csv")
 
 _user_header = ["id", "nama", "email", "password_hash",
