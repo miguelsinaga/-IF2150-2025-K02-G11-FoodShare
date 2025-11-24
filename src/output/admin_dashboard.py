@@ -28,13 +28,13 @@ class AdminDashboard(ctk.CTkFrame):
     def render_ui(self):
         if self.sidebar: self.sidebar.destroy()
         
-        # Sidebar Menu
+        # Nama menu di sini harus SAMA PERSIS dengan string yang dikirim ke self.switch
         self.sidebar = SideMenu(
             self, self.app,
             menu_items=[
                 ("Dashboard", lambda: self.switch("Dashboard")),
-                ("Manage Users", lambda: self.switch("Users")),
-                ("Manage Donations", lambda: self.switch("Donations")),
+                ("Manage Users", lambda: self.switch("Manage Users")),
+                ("Manage Donations", lambda: self.switch("Manage Donations")),
             ],
             active_item=self.current_menu
         )
@@ -46,9 +46,9 @@ class AdminDashboard(ctk.CTkFrame):
         # Render Halaman Sesuai Menu
         if self.current_menu == "Dashboard":
             self.render_overview()
-        elif self.current_menu == "Users":
+        elif self.current_menu == "Manage Users":
             self.render_users()
-        elif self.current_menu == "Donations":
+        elif self.current_menu == "Manage Donations":
             self.render_donations()
 
     def switch(self, menu):
@@ -92,9 +92,9 @@ class AdminDashboard(ctk.CTkFrame):
     def render_users(self):
         ctk.CTkLabel(self.content, text="Manage Users", font=("Arial", 24, "bold"), text_color="#132A13").pack(anchor="w", pady=(0, 20))
 
-        # Header Table
         headers = ["ID", "Name", "Email", "Role", "Status", "Action"]
-        widths = [50, 150, 200, 100, 100, 150]
+        widths = [60, 200, 300, 120, 120, 200] 
+        
         self.create_table_header(self.content, headers, widths)
 
         # Scrollable Content
@@ -118,23 +118,28 @@ class AdminDashboard(ctk.CTkFrame):
         # Status Badge
         status_color = "#E6F4EA" if user.status == "aktif" else "#FCE8E6"
         status_text_color = "#1E8E3E" if user.status == "aktif" else "#D93025"
-        status_wrap = ctk.CTkFrame(row, fg_color=status_color, corner_radius=15, width=110)
+        
+        # === PERBAIKAN TINGGI STATUS ===
+        # Menambahkan height=28 dan menyesuaikan corner_radius menjadi 14
+        status_wrap = ctk.CTkFrame(row, fg_color=status_color, corner_radius=14, width=100, height=28)
         status_wrap.pack(side="left", padx=10)
-        ctk.CTkLabel(status_wrap, text="●", text_color=status_text_color, width=10).pack(side="left", padx=(10, 5))
-        ctk.CTkLabel(status_wrap, text=user.status, text_color=status_text_color).pack(side="left")
+        
+        # Gunakan place untuk centering text badge
+        label_badge = ctk.CTkLabel(status_wrap, text=f"● {user.status}", text_color=status_text_color, font=("Arial", 12))
+        label_badge.place(relx=0.5, rely=0.5, anchor="center")
 
         # Actions
         action_frame = ctk.CTkFrame(row, fg_color="transparent", width=widths[5])
         action_frame.pack(side="left", fill="x", padx=10)
 
-        ctk.CTkButton(action_frame, text="Edit", width=60, fg_color="#F6A836", hover_color="#E59930", text_color="white", 
-                      command=lambda: self.popup_edit_user(user)).pack(side="left", padx=2)
+        ctk.CTkButton(action_frame, text="Edit", width=70, fg_color="#F6A836", hover_color="#E59930", text_color="white", 
+                      command=lambda: self.popup_edit_user(user)).pack(side="left", padx=5)
         
         # Toggle Status Button
         btn_text = "Ban" if user.status == "aktif" else "Active"
         btn_col = "#EF4444" if user.status == "aktif" else "#10B981"
-        ctk.CTkButton(action_frame, text=btn_text, width=60, fg_color=btn_col, hover_color=btn_col, text_color="white", 
-                      command=lambda: self.toggle_user_status(user)).pack(side="left", padx=2)
+        ctk.CTkButton(action_frame, text=btn_text, width=70, fg_color=btn_col, hover_color=btn_col, text_color="white", 
+                      command=lambda: self.toggle_user_status(user)).pack(side="left", padx=5)
 
         ctk.CTkFrame(parent, height=1, fg_color="#EEE").pack(fill="x")
 
@@ -156,7 +161,8 @@ class AdminDashboard(ctk.CTkFrame):
         ctk.CTkLabel(self.content, text="Manage Donations", font=("Arial", 24, "bold"), text_color="#132A13").pack(anchor="w", pady=(0, 20))
 
         headers = ["ID", "Provider ID", "Item", "Status", "Action"]
-        widths = [50, 80, 200, 100, 150]
+        widths = [60, 100, 350, 150, 200]
+        
         self.create_table_header(self.content, headers, widths)
 
         scroll = ctk.CTkScrollableFrame(self.content, fg_color="white", corner_radius=10)
@@ -174,7 +180,7 @@ class AdminDashboard(ctk.CTkFrame):
         ctk.CTkLabel(row, text=str(donasi.idProvider), width=widths[1], anchor="w", text_color="#333").pack(side="left", padx=10)
         ctk.CTkLabel(row, text=donasi.jenisMakanan, width=widths[2], anchor="w", text_color="#333").pack(side="left", padx=10)
 
-        # Status
+        # Status Logic
         status_text = donasi.status
         if status_text == "Tersedia":
             s_bg, s_tc, disp = "#E6F4EA", "#1E8E3E", "Active"
@@ -184,20 +190,24 @@ class AdminDashboard(ctk.CTkFrame):
             s_bg, s_tc, disp = "#FCE8E6", "#D93025", status_text
         else:
             s_bg, s_tc, disp = "#E0F2FE", "#075985", status_text
-        s_wrap = ctk.CTkFrame(row, fg_color=s_bg, corner_radius=15, width=110)
+            
+        # === PERBAIKAN TINGGI STATUS ===
+        # Menambahkan height=28 dan menyesuaikan corner_radius menjadi 14
+        s_wrap = ctk.CTkFrame(row, fg_color=s_bg, corner_radius=14, width=120, height=28)
         s_wrap.pack(side="left", padx=10)
-        ctk.CTkLabel(s_wrap, text="●", text_color=s_tc, width=10).pack(side="left", padx=(10, 5))
-        ctk.CTkLabel(s_wrap, text=disp, text_color=s_tc).pack(side="left")
+        
+        label_badge = ctk.CTkLabel(s_wrap, text=f"● {disp}", text_color=s_tc, font=("Arial", 12))
+        label_badge.place(relx=0.5, rely=0.5, anchor="center")
 
         # Actions
         action_frame = ctk.CTkFrame(row, fg_color="transparent", width=widths[4])
         action_frame.pack(side="left", fill="x", padx=10)
 
-        ctk.CTkButton(action_frame, text="Edit", width=60, fg_color="#F6A836", hover_color="#E59930", text_color="white",
-                      command=lambda: self.popup_edit_donation(donasi)).pack(side="left", padx=2)
+        ctk.CTkButton(action_frame, text="Edit", width=70, fg_color="#F6A836", hover_color="#E59930", text_color="white",
+                      command=lambda: self.popup_edit_donation(donasi)).pack(side="left", padx=5)
         
-        ctk.CTkButton(action_frame, text="Del", width=60, fg_color="#EF4444", hover_color="#B91C1C", text_color="white",
-                      command=lambda: self.delete_donation(donasi)).pack(side="left", padx=2)
+        ctk.CTkButton(action_frame, text="Del", width=70, fg_color="#EF4444", hover_color="#B91C1C", text_color="white",
+                      command=lambda: self.delete_donation(donasi)).pack(side="left", padx=5)
 
         ctk.CTkFrame(parent, height=1, fg_color="#EEE").pack(fill="x")
 

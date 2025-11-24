@@ -17,7 +17,7 @@ class MainApp(ctk.CTk):  # Ubah dari tk.Tk menjadi ctk.CTk
     def __init__(self):
         super().__init__()
         
-        self.title("Food Donation App")
+        self.title("FoodShare")
         self.geometry("1280x800")  # Ukuran awal yang lebih besar
         
         # Izinkan Fullscreen/Maximize

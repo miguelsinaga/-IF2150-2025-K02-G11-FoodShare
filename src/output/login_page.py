@@ -12,68 +12,66 @@ except ImportError:
 
 class LoginPage(ctk.CTkFrame):
     def __init__(self, parent, app):
-        # Set warna background utama menjadi Hijau Lime (#DCEE85)
         super().__init__(parent, fg_color="#DCEE85")
         self.app = app
         
         # --- Palet Warna ---
         self.colors = {
-            "bg_main": "#DCEE85",           # Hijau Lime (Background Utama)
-            "card_bg": "#FFFFFF",           # Putih (Kartu Kiri)
-            "input_bg": "#132A13",          # Hijau Tua Gelap (Input Field)
-            "input_fg": "#FFFFFF",          # Teks Input Putih
-            "placeholder": "#A0B0A0",       # Placeholder abu-abu
-            "btn_bg": "#FFB03B",            # Oranye Tombol
-            "btn_hover": "#E5A035",         # Oranye Gelap (Hover)
-            "text_header": "#132A13",       # Teks Header
-            "text_sub": "#556B2F"           # Teks Sub-header
+            "bg_main": "#DCEE85",
+            "card_bg": "#FFFFFF",
+            "input_bg": "#132A13",
+            "input_fg": "#FFFFFF",
+            "placeholder": "#A0B0A0",
+            "btn_bg": "#FFB03B",
+            "btn_hover": "#E5A035",
+            "text_header": "#132A13",
+            "text_sub": "#556B2F",
+            "dot_active": "#132A13",      # Warna Dot Aktif
+            "dot_inactive": "#C5E064"     # Warna Dot Tidak Aktif
         }
 
-        # Konfigurasi Grid Utama agar FULL SCREEN / Responsive
-        self.grid_columnconfigure(0, weight=1) # Kiri (Kartu Putih)
-        self.grid_columnconfigure(1, weight=1) # Kanan (Form)
+        self.grid_columnconfigure(0, weight=1) 
+        self.grid_columnconfigure(1, weight=1) 
         self.grid_rowconfigure(0, weight=1)
 
+        # Variables for Carousel
+        self.carousel_images = []
+        self.carousel_index = 0
+        self.is_animating = False
+        self.auto_play_task = None
+
         # ===========================================================
-        # BAGIAN KIRI: Floating White Card
+        # BAGIAN KIRI (Logo Kecil & Carousel Besar)
         # ===========================================================
-        self.left_card = ctk.CTkFrame(
-            self, 
-            fg_color=self.colors["card_bg"], 
-            corner_radius=40 
-        )
+        self.left_card = ctk.CTkFrame(self, fg_color=self.colors["card_bg"], corner_radius=40)
         self.left_card.grid(row=0, column=0, sticky="nsew", padx=(30, 15), pady=30)
         
-        # Frame internal untuk menengahkan konten logo
-        self.left_content = ctk.CTkFrame(self.left_card, fg_color="transparent")
-        self.left_content.place(relx=0.5, rely=0.5, anchor="center")
+        # Container Logo (Di Atas)
+        self.logo_container = ctk.CTkFrame(self.left_card, fg_color="transparent")
+        self.logo_container.place(relx=0.5, rely=0.2, anchor="center")
 
         # 1. Logo Image
         image_path = "src/assets/logo.png"
         if os.path.exists(image_path):
             pil_image = Image.open(image_path)
-            self.logo_image = ctk.CTkImage(light_image=pil_image, 
-                                           dark_image=pil_image, 
-                                           size=(220, 220)) 
-            ctk.CTkLabel(self.left_content, text="", image=self.logo_image).pack(pady=(0, 10))
+            self.logo_image = ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=(120, 120))
+            ctk.CTkLabel(self.logo_container, text="", image=self.logo_image).pack(pady=(0, 5))
         else:
-            ctk.CTkLabel(self.left_content, text="[LOGO]", font=("Arial", 24)).pack(pady=(0, 10))
+            ctk.CTkLabel(self.logo_container, text="[LOGO]", font=("Arial", 20)).pack(pady=(0, 5))
 
-        # 2. Text Branding
-        ctk.CTkLabel(self.left_content, text="FoodShare", 
-                     font=("Arial", 36, "bold"), text_color="#E89D30").pack(pady=(0, 15))
+        # 2. Branding Text
+        ctk.CTkLabel(self.logo_container, text="FoodShare", 
+                     font=("Arial", 28, "bold"), text_color="#E89D30").pack(pady=(0, 5))
 
         # 3. Slogan
-        slogan_frame = ctk.CTkFrame(self.left_content, fg_color="transparent")
+        slogan_frame = ctk.CTkFrame(self.logo_container, fg_color="transparent")
         slogan_frame.pack()
+        ctk.CTkLabel(slogan_frame, text="Share More, ", font=("Arial", 14, "bold"), text_color="#132A13").pack(side="left")
+        ctk.CTkLabel(slogan_frame, text="Waste Less", font=("Arial", 14, "bold"), text_color="#A4C639").pack(side="left")
 
-        ctk.CTkLabel(slogan_frame, text="Share More, ", 
-                     font=("Arial", 20, "bold"), text_color="#132A13").pack(side="left")
-        ctk.CTkLabel(slogan_frame, text="Waste Less", 
-                     font=("Arial", 20, "bold"), text_color="#A4C639").pack(side="left")
-
+        # 4. Carousel Container
         self.carousel_container = ctk.CTkFrame(self.left_card, fg_color="transparent")
-        self.carousel_container.place(relx=0.5, rely=0.9, anchor="center")
+        self.carousel_container.place(relx=0.5, rely=0.65, anchor="center") 
         self.setup_carousel()
 
         # ===========================================================
@@ -85,101 +83,63 @@ class LoginPage(ctk.CTkFrame):
         self.form_container = ctk.CTkFrame(self.right_panel, fg_color="transparent", width=350)
         self.form_container.place(relx=0.5, rely=0.5, anchor="center")
 
-        # 1. Header Text
         ctk.CTkLabel(self.form_container, text="Welcome Back!", 
                      font=("Arial", 28, "bold"), text_color=self.colors["text_header"]).pack(pady=(0, 5))
         
         ctk.CTkLabel(self.form_container, text="Login to your account", 
                      font=("Arial", 14), text_color=self.colors["text_sub"]).pack(pady=(0, 40))
 
-        # 2. Input Username
         self.email_entry = ctk.CTkEntry(
-            self.form_container,
-            width=350,
-            height=55,
-            corner_radius=15,
-            fg_color=self.colors["input_bg"],
-            text_color=self.colors["input_fg"],
-            placeholder_text="Username",
-            placeholder_text_color=self.colors["placeholder"],
-            border_width=0,
-            font=("Arial", 14)
+            self.form_container, width=350, height=55, corner_radius=15,
+            fg_color=self.colors["input_bg"], text_color=self.colors["input_fg"],
+            placeholder_text="Username", placeholder_text_color=self.colors["placeholder"],
+            border_width=0, font=("Arial", 14)
         )
         self.email_entry.pack(pady=(0, 20))
 
-        # 3. Input Password
         self.password_entry = ctk.CTkEntry(
-            self.form_container,
-            width=350,
-            height=55,
-            corner_radius=15,
-            fg_color=self.colors["input_bg"],
-            text_color=self.colors["input_fg"],
-            placeholder_text="Password",
-            placeholder_text_color=self.colors["placeholder"],
-            border_width=0,
-            show="*",
-            font=("Arial", 14)
+            self.form_container, width=350, height=55, corner_radius=15,
+            fg_color=self.colors["input_bg"], text_color=self.colors["input_fg"],
+            placeholder_text="Password", placeholder_text_color=self.colors["placeholder"],
+            border_width=0, show="*", font=("Arial", 14)
         )
         self.password_entry.pack(pady=(0, 10))
 
-        # 4. Forgot Password Link (Efek Hover Khusus)
         self.forgot_btn = ctk.CTkButton(
-            self.form_container, 
-            text="Forgot Password?", 
-            font=("Arial", 12, "bold"),
-            fg_color="transparent", 
-            text_color="#132A13",          # Warna normal
-            hover_color=self.colors["bg_main"], # Background saat hover (tetap transparan/sama bg)
-            anchor="e",
-            width=350,
-            cursor="hand2",
-            command=lambda: print("Forgot Password clicked")
+            self.form_container, text="Forgot Password?", font=("Arial", 12, "bold"),
+            fg_color="transparent", text_color="#132A13", hover_color=self.colors["bg_main"],
+            anchor="e", width=350, cursor="hand2", command=lambda: print("Forgot Password clicked")
         )
-        # Bind events untuk ubah warna teks saat hover
         self.forgot_btn.bind("<Enter>", lambda e: self.forgot_btn.configure(text_color="#FFB03B"))
         self.forgot_btn.bind("<Leave>", lambda e: self.forgot_btn.configure(text_color="#132A13"))
         self.forgot_btn.pack(pady=(0, 25))
 
-        # 5. Tombol Login
         self.login_btn = ctk.CTkButton(
-            self.form_container,
-            text="Login",
-            font=("Arial", 18, "bold"),
-            width=350,
-            height=55,
-            corner_radius=15,
-            fg_color=self.colors["btn_bg"],
-            text_color="#132A13",
-            hover_color=self.colors["btn_hover"],
-            cursor="hand2",
+            self.form_container, text="Login", font=("Arial", 18, "bold"),
+            width=350, height=55, corner_radius=15, fg_color=self.colors["btn_bg"],
+            text_color="#132A13", hover_color=self.colors["btn_hover"], cursor="hand2",
             command=self.do_login
         )
         self.login_btn.pack(pady=(0, 25))
 
-        # 6. Sign Up Area (Efek Hover pada Teks "sign up")
         signup_frame = ctk.CTkFrame(self.form_container, fg_color="transparent")
         signup_frame.pack()
 
-        ctk.CTkLabel(signup_frame, text="Don't have an account? ", 
-                     font=("Arial", 12), text_color="#556B2F").pack(side="left")
+        ctk.CTkLabel(signup_frame, text="Don't have an account? ", font=("Arial", 12), text_color="#556B2F").pack(side="left")
         
         self.signup_btn = ctk.CTkButton(
-            signup_frame,
-            text="sign up",
-            font=("Arial", 12, "bold"),
-            fg_color="transparent",
-            text_color="#132A13",
-            width=50,
-            hover_color=self.colors["bg_main"], # Hindari kotak hover terlihat
-            cursor="hand2",
+            signup_frame, text="sign up", font=("Arial", 12, "bold"),
+            fg_color="transparent", text_color="#132A13", width=50,
+            hover_color=self.colors["bg_main"], cursor="hand2",
             command=lambda: app.show_frame("RegisterPage")
         )
-        # Bind events manual untuk text color change
         self.signup_btn.bind("<Enter>", lambda e: self.signup_btn.configure(text_color="#FFB03B"))
         self.signup_btn.bind("<Leave>", lambda e: self.signup_btn.configure(text_color="#132A13"))
         self.signup_btn.pack(side="left")
 
+    # ============================================================
+    # CAROUSEL LOGIC (SMOOTH EASE-IN-OUT + DOTS)
+    # ============================================================
     def setup_carousel(self):
         base = os.path.join("src", "assets")
         files = [
@@ -188,64 +148,135 @@ class LoginPage(ctk.CTkFrame):
             os.path.join(base, "PhotoCarousel3.jpg"),
             os.path.join(base, "PhotoCarousel4.jpg"),
         ]
-        self.carousel_images = []
+        
+        img_w, img_h = 500, 320 
+        
         for f in files:
             try:
                 pil = Image.open(f)
-                self.carousel_images.append(ctk.CTkImage(light_image=pil, dark_image=pil, size=(420, 240)))
+                self.carousel_images.append(ctk.CTkImage(light_image=pil, dark_image=pil, size=(img_w, img_h)))
             except Exception:
                 pass
+                
         if not self.carousel_images:
             lbl = ctk.CTkLabel(self.carousel_container, text="[Carousel Images Missing]", text_color="#132A13")
             lbl.pack()
             return
+            
         self.carousel_index = 0
+        
+        # Container size fix
+        self.carousel_container.configure(width=img_w, height=img_h + 50) 
+
+        # Current Image Label
         self.carousel_current = ctk.CTkLabel(self.carousel_container, text="", image=self.carousel_images[0])
-        self.carousel_current.place(relx=0.5, rely=0.5, anchor="center")
+        self.carousel_current.place(relx=0.5, rely=0.45, anchor="center")
 
-        ctrl = ctk.CTkFrame(self.carousel_container, fg_color="transparent")
-        ctrl.pack(side="bottom", pady=6)
-        ctk.CTkButton(ctrl, text="◀", width=28, height=28, corner_radius=14, fg_color="white", text_color="#132A13", hover_color="#F0F0F0", command=self.prev_slide).pack(side="left", padx=4)
-        ctk.CTkButton(ctrl, text="▶", width=28, height=28, corner_radius=14, fg_color="white", text_color="#132A13", hover_color="#F0F0F0", command=self.next_slide).pack(side="left", padx=4)
+        # Dot Controls Container
+        self.dots_frame = ctk.CTkFrame(self.carousel_container, fg_color="transparent")
+        self.dots_frame.place(relx=0.5, rely=0.95, anchor="center")
+        
+        self.create_dots()
+        self.start_auto_play()
 
-        self.carousel_interval_ms = 4000
-        self.after(self.carousel_interval_ms, self.auto_next)
+    def create_dots(self):
+        self.dots_widgets = []
+        for i in range(len(self.carousel_images)):
+            # Gunakan Button kecil sebagai dot
+            dot = ctk.CTkButton(
+                self.dots_frame, 
+                text="", 
+                width=12, 
+                height=12, 
+                corner_radius=6, # Membuatnya bulat
+                fg_color=self.colors["dot_active"] if i == 0 else self.colors["dot_inactive"],
+                hover_color=self.colors["dot_active"],
+                command=lambda idx=i: self.manual_slide(idx)
+            )
+            dot.pack(side="left", padx=5)
+            self.dots_widgets.append(dot)
+
+    def update_dots(self):
+        for i, dot in enumerate(self.dots_widgets):
+            color = self.colors["dot_active"] if i == self.carousel_index else self.colors["dot_inactive"]
+            dot.configure(fg_color=color)
+
+    def start_auto_play(self):
+        if self.auto_play_task:
+            self.after_cancel(self.auto_play_task)
+        self.auto_play_task = self.after(4000, self.auto_next)
 
     def auto_next(self):
-        self.next_slide()
-        self.after(self.carousel_interval_ms, self.auto_next)
+        if self.winfo_exists():
+            next_idx = (self.carousel_index + 1) % len(self.carousel_images)
+            self.animate_to(next_idx, direction=1)
+            self.start_auto_play()
 
-    def prev_slide(self):
-        n = (self.carousel_index - 1) % len(self.carousel_images)
-        self.animate_to(n, direction=-1)
+    def manual_slide(self, target_index):
+        if self.is_animating or target_index == self.carousel_index:
+            return
+        
+        # Tentukan arah berdasarkan index
+        direction = 1 if target_index > self.carousel_index else -1
+        
+        # Restart timer auto play agar tidak tabrakan
+        self.start_auto_play()
+        self.animate_to(target_index, direction)
 
-    def next_slide(self):
-        n = (self.carousel_index + 1) % len(self.carousel_images)
-        self.animate_to(n, direction=1)
+    def ease_in_out(self, t):
+        # Cubic Ease-In-Out Function for smoothness
+        return t * t * (3 - 2 * t)
 
-    def animate_to(self, next_index: int, direction: int = 1):
+    def animate_to(self, next_index, direction=1):
+        if self.is_animating: return
+        self.is_animating = True
+
         next_img = self.carousel_images[next_index]
-        w = 440
-        start_x = 0.5 + (1.0 if direction > 0 else -1.0)
-        next_label = ctk.CTkLabel(self.carousel_container, text="", image=next_img)
-        next_label.place(relx=start_x, rely=0.5, anchor="center")
+        
+        # Posisi Awal
+        start_x_current = 0.5
+        start_x_next = 0.5 + (1.0 * direction) # Masuk dari kanan (1) atau kiri (-1)
+        
+        # Buat label baru untuk gambar selanjutnya
+        self.next_label = ctk.CTkLabel(self.carousel_container, text="", image=next_img)
+        self.next_label.place(relx=start_x_next, rely=0.45, anchor="center")
+        
+        # Raise label agar berada di atas dot jika overlap (opsional)
+        self.next_label.lift()
+        if self.dots_frame: self.dots_frame.lift()
 
-        steps = 12
-        delay = 22
+        steps = 30  # Jumlah frame animasi (semakin tinggi semakin halus tapi berat)
+        delay = 15  # Delay per frame dalam ms
 
         def step(i=0):
-            delta = (i + 1) / steps
-            cur_x = 0.5 - delta * (1.0 if direction > 0 else -1.0)
-            nxt_x = start_x - delta * (1.0 if direction > 0 else -1.0)
-            self.carousel_current.place(relx=cur_x, rely=0.5, anchor="center")
-            next_label.place(relx=nxt_x, rely=0.5, anchor="center")
-            if i < steps:
-                self.after(delay, lambda: step(i + 1))
-            else:
+            if i > steps:
+                # Selesai Animasi
                 self.carousel_current.destroy()
-                self.carousel_current = next_label
+                self.carousel_current = self.next_label
                 self.carousel_index = next_index
+                self.update_dots()
+                self.is_animating = False
+                return
 
+            # Hitung progress linear (0.0 ke 1.0)
+            p = i / steps
+            
+            # Terapkan Ease-In-Out
+            eased_p = self.ease_in_out(p)
+
+            # Hitung posisi berdasarkan eased progress
+            # Current image bergerak keluar (0.5 -> -0.5 atau 1.5)
+            current_target = 0.5 - (1.0 * direction * eased_p)
+            
+            # Next image bergerak masuk (1.5 atau -0.5 -> 0.5)
+            next_target = start_x_next - (1.0 * direction * eased_p)
+
+            self.carousel_current.place(relx=current_target, rely=0.45, anchor="center")
+            self.next_label.place(relx=next_target, rely=0.45, anchor="center")
+
+            self.after(delay, lambda: step(i + 1))
+
+        step(0)
 
     def do_login(self):
         email = self.email_entry.get().strip()
