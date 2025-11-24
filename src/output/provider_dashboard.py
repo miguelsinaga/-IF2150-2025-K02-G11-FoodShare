@@ -8,6 +8,7 @@ import functools
 
 # Pastikan path import ini benar di proyek Anda
 from src.output.side_menu import SideMenu
+from src.model.makanan import DataMakanan
 from src.controller.donasi_controller import DonasiController
 from src.controller.request_controller import RequestController
 from src.controller.feedback_controller import FeedbackController
@@ -142,8 +143,26 @@ class ProviderDashboard(ctk.CTkFrame):
 
         banner = ctk.CTkFrame(self.content_frame, fg_color="#DCEE85", corner_radius=10)
         banner.pack(fill="x", pady=30, ipady=10)
-        ctk.CTkLabel(banner, text="♻ You've helped share meals this month.", 
-                     text_color="#132A13", font=("Arial", 16, "bold")).pack(anchor="w", padx=20)
+
+        icon = self.icon_cache.get("Total Donations")
+        left = ctk.CTkFrame(banner, fg_color="transparent")
+        left.pack(side="left", padx=20, pady=10)
+        if icon:
+            ctk.CTkLabel(left, text="", image=icon).pack()
+        else:
+            ctk.CTkLabel(left, text="♻", font=("Arial", 28), text_color="#132A13").pack()
+
+        content = ctk.CTkFrame(banner, fg_color="transparent")
+        content.pack(side="left", fill="x", expand=True)
+        ctk.CTkLabel(content, text="You've helped share meals this month.", 
+                     text_color="#132A13", font=("Arial", 16, "bold")).pack(anchor="w")
+
+        val = self.calculate_monthly_meals(user.id)
+        formatted = f"{val:,}"
+        self.monthly_meals_label = ctk.CTkLabel(content, text=formatted, font=("Arial", 30, "bold"), text_color="#132A13")
+        self.monthly_meals_label.pack(anchor="w")
+
+        self.after(5000, lambda: self.update_monthly_meals_banner(user.id))
 
 
     def create_stat_card(self, parent, title, value, bg_color):
@@ -163,6 +182,31 @@ class ProviderDashboard(ctk.CTkFrame):
         ctk.CTkLabel(card, text=title, font=("Arial", 12), text_color="#A0B0A0").pack(anchor="w", padx=15)
         ctk.CTkLabel(card, text=value, font=("Arial", 28, "bold"), text_color="white").pack(anchor="w", padx=15, pady=(0, 15))
         return card
+
+    def calculate_monthly_meals(self, provider_id: int) -> int:
+        today = date.today()
+        ym = today.strftime("%Y-%m")
+        total = 0
+        try:
+            reqs = RequestController.getRequestByProviderId(provider_id)
+        except Exception:
+            reqs = []
+        for r in reqs:
+            try:
+                if r.status == "Completed" and (r.tanggalRequest or "").startswith(ym):
+                    d = DataMakanan.find_by_id(r.idDonasi)
+                    if d and d.jumlahPorsi:
+                        total += int(d.jumlahPorsi)
+            except Exception:
+                pass
+        return total
+
+    def update_monthly_meals_banner(self, provider_id: int):
+        if hasattr(self, "monthly_meals_label") and self.monthly_meals_label:
+            val = self.calculate_monthly_meals(provider_id)
+            self.monthly_meals_label.configure(text=f"{val:,}")
+        # schedule again for real-time-ish updates
+        self.after(5000, lambda: self.update_monthly_meals_banner(provider_id))
 
     # ==============================================================
     # 2. FOOD STOCK (Revisi ke Pack dengan Lebar Tetap)
