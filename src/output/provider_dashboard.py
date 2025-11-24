@@ -38,7 +38,6 @@ class ProviderDashboard(ctk.CTkFrame):
 
     def load_icons(self):
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        # !!! PASTIKAN PATH INI BENAR SESUAI STRUKTUR FOLDER ANDA !!!
         base_path = os.path.join(script_dir, "../../src/assets") 
         
         icon_names = {
@@ -513,7 +512,8 @@ class AddDonasiPopup(ctk.CTkToplevel):
             self.mode = "add"
 
         self.transient(parent) 
-        self.grab_set() 
+        self.wait_visibility() 
+        self.grab_set()
         self.resizable(False, False)
         
         window_width = 500
