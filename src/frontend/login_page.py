@@ -3,8 +3,13 @@ from tkinter import messagebox
 import customtkinter as ctk
 from PIL import Image
 import os
-
+from flask import Flask,request,jsonify
+#from src.controller.account_controller_api import AkunControllerAPI as AccountController
 # Fallback import controller
+from src.backend.api.client_api import api_login
+from src.model.user import Pengguna
+from src.backend.user_data import UserRepo
+
 try:
     from src.controller.account_controller import AkunController
 except ImportError:
@@ -12,10 +17,11 @@ except ImportError:
 
 class LoginPage(ctk.CTkFrame):
     def __init__(self, parent, app):
+        # Set warna background utama menjadi Hijau Lime (#DCEE85)
         super().__init__(parent, fg_color="#DCEE85")
         self.app = app
         
-        # --- Palet Warna ---
+        # FOR COLORS
         self.colors = {
             "bg_main": "#DCEE85",
             "card_bg": "#FFFFFF",
@@ -26,32 +32,28 @@ class LoginPage(ctk.CTkFrame):
             "btn_hover": "#E5A035",
             "text_header": "#132A13",
             "text_sub": "#556B2F",
-            "dot_active": "#132A13",      # Warna Dot Aktif
-            "dot_inactive": "#C5E064"     # Warna Dot Tidak Aktif
+            "dot_active": "#132A13",
+            "dot_inactive": "#C5E064"
         }
 
         self.grid_columnconfigure(0, weight=1) 
         self.grid_columnconfigure(1, weight=1) 
         self.grid_rowconfigure(0, weight=1)
 
-        # Variables for Carousel
+        # FOR CAROUSEL (IMAGE DI DIV KIRI)
         self.carousel_images = []
         self.carousel_index = 0
         self.is_animating = False
         self.auto_play_task = None
 
-        # ===========================================================
-        # BAGIAN KIRI (Logo Kecil & Carousel Besar)
-        # ===========================================================
+        # LEFT DIV
         self.left_card = ctk.CTkFrame(self, fg_color=self.colors["card_bg"], corner_radius=40)
         self.left_card.grid(row=0, column=0, sticky="nsew", padx=(30, 15), pady=30)
         
-        # Container Logo (Di Atas)
         self.logo_container = ctk.CTkFrame(self.left_card, fg_color="transparent")
         self.logo_container.place(relx=0.5, rely=0.2, anchor="center")
 
-        # 1. Logo Image
-        image_path = "src/assets/logo.png"
+        image_path = "img/logo.png"
         if os.path.exists(image_path):
             pil_image = Image.open(image_path)
             self.logo_image = ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=(120, 120))
@@ -59,36 +61,34 @@ class LoginPage(ctk.CTkFrame):
         else:
             ctk.CTkLabel(self.logo_container, text="[LOGO]", font=("Arial", 20)).pack(pady=(0, 5))
 
-        # 2. Branding Text
+
         ctk.CTkLabel(self.logo_container, text="FoodShare", 
                      font=("Arial", 28, "bold"), text_color="#E89D30").pack(pady=(0, 5))
 
-        # 3. Slogan
         slogan_frame = ctk.CTkFrame(self.logo_container, fg_color="transparent")
         slogan_frame.pack()
         ctk.CTkLabel(slogan_frame, text="Share More, ", font=("Arial", 14, "bold"), text_color="#132A13").pack(side="left")
         ctk.CTkLabel(slogan_frame, text="Waste Less", font=("Arial", 14, "bold"), text_color="#A4C639").pack(side="left")
 
-        # 4. Carousel Container
         self.carousel_container = ctk.CTkFrame(self.left_card, fg_color="transparent")
         self.carousel_container.place(relx=0.5, rely=0.65, anchor="center") 
         self.setup_carousel()
 
-        # ===========================================================
-        # BAGIAN KANAN: Form Login
-        # ===========================================================
+        # LOGIN FORM
         self.right_panel = ctk.CTkFrame(self, fg_color="transparent")
         self.right_panel.grid(row=0, column=1, sticky="nsew", padx=(15, 30), pady=30)
 
         self.form_container = ctk.CTkFrame(self.right_panel, fg_color="transparent", width=350)
         self.form_container.place(relx=0.5, rely=0.5, anchor="center")
 
+        # 1. Header Text
         ctk.CTkLabel(self.form_container, text="Welcome Back!", 
                      font=("Arial", 28, "bold"), text_color=self.colors["text_header"]).pack(pady=(0, 5))
         
         ctk.CTkLabel(self.form_container, text="Login to your account", 
                      font=("Arial", 14), text_color=self.colors["text_sub"]).pack(pady=(0, 40))
 
+        # 2. Input Username
         self.email_entry = ctk.CTkEntry(
             self.form_container, width=350, height=55, corner_radius=15,
             fg_color=self.colors["input_bg"], text_color=self.colors["input_fg"],
@@ -97,6 +97,7 @@ class LoginPage(ctk.CTkFrame):
         )
         self.email_entry.pack(pady=(0, 20))
 
+        # 3. Input Password
         self.password_entry = ctk.CTkEntry(
             self.form_container, width=350, height=55, corner_radius=15,
             fg_color=self.colors["input_bg"], text_color=self.colors["input_fg"],
@@ -105,15 +106,18 @@ class LoginPage(ctk.CTkFrame):
         )
         self.password_entry.pack(pady=(0, 10))
 
+        # 4. Forgot Password Link (Efek Hover Khusus)
         self.forgot_btn = ctk.CTkButton(
             self.form_container, text="Forgot Password?", font=("Arial", 12, "bold"),
             fg_color="transparent", text_color="#132A13", hover_color=self.colors["bg_main"],
-            anchor="e", width=350, cursor="hand2", command=lambda: print("Forgot Password clicked")
+            anchor="e", width=350, cursor="hand2", command=lambda: self.app.show_frame("ForgotPassword")
         )
+        # Bind events untuk ubah warna teks saat hover
         self.forgot_btn.bind("<Enter>", lambda e: self.forgot_btn.configure(text_color="#FFB03B"))
         self.forgot_btn.bind("<Leave>", lambda e: self.forgot_btn.configure(text_color="#132A13"))
         self.forgot_btn.pack(pady=(0, 25))
 
+        # 5. Tombol Login
         self.login_btn = ctk.CTkButton(
             self.form_container, text="Login", font=("Arial", 18, "bold"),
             width=350, height=55, corner_radius=15, fg_color=self.colors["btn_bg"],
@@ -122,6 +126,7 @@ class LoginPage(ctk.CTkFrame):
         )
         self.login_btn.pack(pady=(0, 25))
 
+        # 6. Sign Up Area (Efek Hover pada Teks "sign up")
         signup_frame = ctk.CTkFrame(self.form_container, fg_color="transparent")
         signup_frame.pack()
 
@@ -133,15 +138,14 @@ class LoginPage(ctk.CTkFrame):
             hover_color=self.colors["bg_main"], cursor="hand2",
             command=lambda: app.show_frame("RegisterPage")
         )
+        # Bind events manual untuk text color change
         self.signup_btn.bind("<Enter>", lambda e: self.signup_btn.configure(text_color="#FFB03B"))
         self.signup_btn.bind("<Leave>", lambda e: self.signup_btn.configure(text_color="#132A13"))
         self.signup_btn.pack(side="left")
 
-    # ============================================================
-    # CAROUSEL LOGIC (SMOOTH EASE-IN-OUT + DOTS)
-    # ============================================================
+    # LOGIC FOR CAROUSEL
     def setup_carousel(self):
-        base = os.path.join("src", "assets")
+        base = "img"
         files = [
             os.path.join(base, "PhotoCarousel1.jpg"),
             os.path.join(base, "PhotoCarousel2.jpg"),
@@ -165,14 +169,11 @@ class LoginPage(ctk.CTkFrame):
             
         self.carousel_index = 0
         
-        # Container size fix
         self.carousel_container.configure(width=img_w, height=img_h + 50) 
 
-        # Current Image Label
         self.carousel_current = ctk.CTkLabel(self.carousel_container, text="", image=self.carousel_images[0])
         self.carousel_current.place(relx=0.5, rely=0.45, anchor="center")
 
-        # Dot Controls Container
         self.dots_frame = ctk.CTkFrame(self.carousel_container, fg_color="transparent")
         self.dots_frame.place(relx=0.5, rely=0.95, anchor="center")
         
@@ -182,13 +183,12 @@ class LoginPage(ctk.CTkFrame):
     def create_dots(self):
         self.dots_widgets = []
         for i in range(len(self.carousel_images)):
-            # Gunakan Button kecil sebagai dot
             dot = ctk.CTkButton(
                 self.dots_frame, 
                 text="", 
                 width=12, 
                 height=12, 
-                corner_radius=6, # Membuatnya bulat
+                corner_radius=6,
                 fg_color=self.colors["dot_active"] if i == 0 else self.colors["dot_inactive"],
                 hover_color=self.colors["dot_active"],
                 command=lambda idx=i: self.manual_slide(idx)
@@ -216,15 +216,12 @@ class LoginPage(ctk.CTkFrame):
         if self.is_animating or target_index == self.carousel_index:
             return
         
-        # Tentukan arah berdasarkan index
         direction = 1 if target_index > self.carousel_index else -1
         
-        # Restart timer auto play agar tidak tabrakan
         self.start_auto_play()
         self.animate_to(target_index, direction)
 
     def ease_in_out(self, t):
-        # Cubic Ease-In-Out Function for smoothness
         return t * t * (3 - 2 * t)
 
     def animate_to(self, next_index, direction=1):
@@ -233,24 +230,20 @@ class LoginPage(ctk.CTkFrame):
 
         next_img = self.carousel_images[next_index]
         
-        # Posisi Awal
         start_x_current = 0.5
-        start_x_next = 0.5 + (1.0 * direction) # Masuk dari kanan (1) atau kiri (-1)
+        start_x_next = 0.5 + (1.0 * direction)
         
-        # Buat label baru untuk gambar selanjutnya
         self.next_label = ctk.CTkLabel(self.carousel_container, text="", image=next_img)
         self.next_label.place(relx=start_x_next, rely=0.45, anchor="center")
         
-        # Raise label agar berada di atas dot jika overlap (opsional)
         self.next_label.lift()
         if self.dots_frame: self.dots_frame.lift()
 
-        steps = 30  # Jumlah frame animasi (semakin tinggi semakin halus tapi berat)
-        delay = 15  # Delay per frame dalam ms
+        steps = 30
+        delay = 15
 
         def step(i=0):
             if i > steps:
-                # Selesai Animasi
                 self.carousel_current.destroy()
                 self.carousel_current = self.next_label
                 self.carousel_index = next_index
@@ -258,17 +251,12 @@ class LoginPage(ctk.CTkFrame):
                 self.is_animating = False
                 return
 
-            # Hitung progress linear (0.0 ke 1.0)
             p = i / steps
             
-            # Terapkan Ease-In-Out
             eased_p = self.ease_in_out(p)
 
-            # Hitung posisi berdasarkan eased progress
-            # Current image bergerak keluar (0.5 -> -0.5 atau 1.5)
             current_target = 0.5 - (1.0 * direction * eased_p)
             
-            # Next image bergerak masuk (1.5 atau -0.5 -> 0.5)
             next_target = start_x_next - (1.0 * direction * eased_p)
 
             self.carousel_current.place(relx=current_target, rely=0.45, anchor="center")
@@ -286,12 +274,39 @@ class LoginPage(ctk.CTkFrame):
             messagebox.showwarning("Warning", "Mohon lengkapi data login.")
             return
 
+        # 1. Coba login lewat API (konsisten dengan Register)
+        try:
+            api_res = api_login(email, pw)
+            if api_res.get("status") == "SUCCESS":
+                ud = api_res.get("user", {})
+                repo = UserRepo()
+                local = repo.find_by_email(ud.get("email"))
+                if not local:
+                    repo.save({
+                        "nama": ud.get("nama", ""),
+                        "email": ud.get("email", ""),
+                        "password_hash": ud.get("password_hash", ""),
+                        "noTelepon": ud.get("noTelepon", ""),
+                        "role": ud.get("role", "receiver"),
+                        "status": ud.get("status", "aktif")
+                    })
+                    local = repo.find_by_email(ud.get("email"))
+                user_obj = Pengguna(**local)
+                messagebox.showinfo("Success", "Login berhasil!")
+                self.app.login_success(user_obj)
+                return
+        except Exception:
+            pass
+
+        # 2. Fallback ke controller lokal (MySQL lokal)
         try:
             result = AkunController.prosesLogin(email, pw)
-            if result["status"] == "SUCCESS":
+            if result.get("status") == "SUCCESS":
+                u = result.get("user")
+                user_obj = Pengguna(**u) if isinstance(u, dict) else u
                 messagebox.showinfo("Success", "Login berhasil!")
-                self.app.login_success(result["user"])
+                self.app.login_success(user_obj)
             else:
-                messagebox.showerror("Error", result["message"])
+                messagebox.showerror("Error", result.get("message", "login gagal"))
         except NameError:
             messagebox.showinfo("Test Mode", f"Login UI Checked.\nEmail: {email}\nPass: {pw}")

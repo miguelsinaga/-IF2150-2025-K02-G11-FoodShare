@@ -1,7 +1,8 @@
-# src/model/laporandonasi.py
 from dataclasses import dataclass
 from datetime import datetime
-from src.backend.laporan import LaporanRepo
+from src.backend.laporan_data import LaporanRepo
+from src.model.reqdonasi import RequestDonasi
+from src.model.makanan import DataMakanan
 
 repo = LaporanRepo()
 
@@ -31,3 +32,21 @@ class LaporanDonasi:
 
     def save(self):
         repo.save(self.__dict__)
+
+    def catatLaporan(self):
+        if not self.tanggalLaporan:
+            self.tanggalLaporan = datetime.now().isoformat()
+        self.estimasiPengurangan = self.generateEstimasiPengurangan()
+        self.save()
+
+    def generateEstimasiPengurangan(self) -> float:
+        req = RequestDonasi.find_by_id(self.idRequest)
+        if not req:
+            return 0.0
+        don = DataMakanan.find_by_id(req.idDonasi)
+        if not don:
+            return 0.0
+        return float(don.jumlahPorsi) * 0.3
+
+    def getDetail(self) -> str:
+        return f"Laporan #{self.idLaporan} untuk Request #{self.idRequest} ({self.jenisLaporan})"

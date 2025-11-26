@@ -1,14 +1,13 @@
 import tkinter as tk
 import customtkinter as ctk  # Disarankan import ini jika menggunakan komponen CTk
 
-# Import halaman-halaman (Sesuaikan path import dengan struktur folder Anda)
-# Saya menggunakan try-except agar kode ini aman dijalankan meski file lain belum ada
-from src.output.login_page import LoginPage
-from src.output.register_page import RegisterPage
-from src.output.provider_dashboard import ProviderDashboard
-from src.output.receiver_dashboard import ReceiverDashboard
-from src.output.admin_dashboard import AdminDashboard
 
+from src.frontend.login_page import LoginPage
+from src.frontend.register_page import RegisterPage
+from src.frontend.provider_dashboard import ProviderDashboard
+from src.frontend.receiver_dashboard import ReceiverDashboard
+from src.frontend.admin_dashboard import AdminDashboard
+from src.frontend.forgot_password import ForgotPassword
 class MainApp(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -35,6 +34,7 @@ class MainApp(tk.Tk):
         # Daftar halaman yang akan dimuat
         pages = (
             LoginPage,
+            ForgotPassword,
             RegisterPage,
             ProviderDashboard,
             ReceiverDashboard,

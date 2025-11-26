@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from typing import Optional
 from datetime import datetime
-from src.backend.datamakanan import DataMakananRepo
+from src.backend.makanan_data import DataMakananRepo
 
 repo = DataMakananRepo()
 
@@ -41,7 +41,7 @@ class DataMakanan:
 
     @staticmethod
     def aktif():
-        return [d for d in DataMakanan.all() if d.status.lower() == "tersedia"]
+        return [d for d in DataMakanan.all() if d.status.lower() in ("tersedia", "layak")]
 
     def save(self):
         if not self.tanggal_donasi:
@@ -50,3 +50,21 @@ class DataMakanan:
 
     def update(self):
         repo.update(self.__dict__)
+
+    def setStatus(self, status: str):
+        self.status = status
+        self.update()
+
+    def getDetail(self) -> str:
+        return f"#{self.idDonasi} {self.jenisMakanan} {self.jumlahPorsi} {self.lokasi} {self.batasWaktu} {self.status}"
+
+    def updateData(self, data: dict):
+        self.jenisMakanan = data.get("jenisMakanan", self.jenisMakanan)
+        self.jumlahPorsi = int(data.get("jumlahPorsi", self.jumlahPorsi))
+        self.lokasi = data.get("lokasi", self.lokasi)
+        self.batasWaktu = data.get("batasWaktu", self.batasWaktu)
+        self.status = data.get("status", self.status)
+        self.update()
+
+    def hapusData(self):
+        repo.delete(self.idDonasi)

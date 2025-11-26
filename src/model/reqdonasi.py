@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from typing import Optional
 from datetime import datetime
-from src.backend.request import RequestRepo
+from src.backend.request_data import RequestRepo
 
 repo = RequestRepo()
 
@@ -44,3 +44,13 @@ class RequestDonasi:
 
     def update(self):
         repo.update(self.__dict__)
+
+    def setStatus(self, status: str):
+        self.status = status
+        self.update()
+
+    def getStatus(self) -> str:
+        return self.status
+
+    def getDetail(self) -> str:
+        return f"Request #{self.idRequest} Donasi #{self.idDonasi} Receiver #{self.idReceiver} {self.status}"

@@ -3,6 +3,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 from PIL import Image
 import os
+from src.backend.api.client_api import api_register
 
 # Fallback import controller
 try:
@@ -43,7 +44,7 @@ class RegisterPage(ctk.CTkFrame):
         self.left_content.place(relx=0.5, rely=0.5, anchor="center")
 
         # Logo
-        image_path = "src/assets/logo.png"
+        image_path = "img/logo.png"
         if os.path.exists(image_path):
             pil_image = Image.open(image_path)
             self.logo_image = ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=(220, 220))
@@ -51,8 +52,8 @@ class RegisterPage(ctk.CTkFrame):
         else:
             ctk.CTkLabel(self.left_content, text="[LOGO]", font=("Arial", 24)).pack(pady=(0, 10))
 
-        ctk.CTkLabel(self.left_content, text="FoodShare", 
-                     font=("Arial", 36, "bold"), text_color="#E89D30").pack(pady=(0, 15))
+        # ctk.CTkLabel(self.left_content, text="FoodShare", 
+        #              font=("Arial", 36, "bold"), text_color="#E89D30").pack(pady=(0, 15))
 
         slogan_frame = ctk.CTkFrame(self.left_content, fg_color="transparent")
         slogan_frame.pack()
@@ -174,7 +175,8 @@ class RegisterPage(ctk.CTkFrame):
         }
 
         try:
-            result = AkunController.prosesRegistrasi(data)
+            # result = AkunController.prosesRegistrasi(data)
+            result = api_register(nama,email,pw,phone,role)
             if result["status"] == "SUCCESS":
                 messagebox.showinfo("Success", f"Registrasi sebagai {role} berhasil! Silakan login.")
                 self.app.show_frame("LoginPage")
