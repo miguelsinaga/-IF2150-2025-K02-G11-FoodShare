@@ -1,21 +1,19 @@
+import os
 import mysql.connector
 from mysql.connector import errorcode
 from flask import Flask, request, jsonify
+
 def get_connection():
-
     config = {
-        'user' : 'foodshare_user',
-        'password' : 'janganbuangbuangmakanan',
-        'host' : 'localhost',
-        'port': 3306,
-        'database' : 'foodshare'
+        'user': os.getenv('DB_USER', 'foodshare_user'),
+        'password': os.getenv('DB_PASS', 'janganbuangbuangmakanan'),
+        'host': os.getenv('DB_HOST', 'localhost'),
+        'port': int(os.getenv('DB_PORT', '3306')),
+        'database': os.getenv('DB_NAME', 'foodshare'),
     }
-    try : 
-        cnx = mysql.connector.connect(
-            **config
-        )
+    try:
+        cnx = mysql.connector.connect(**config)
         return cnx
-
     except mysql.connector.Error as err:
         if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
             print("Something is wrong with your user name or password")

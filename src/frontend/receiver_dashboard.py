@@ -439,8 +439,8 @@ class ReceiverDashboard(ctk.CTkFrame):
     def do_request(self, idDonasi):
         if messagebox.askyesno("Confirm", "Request this food?"):
             result = RequestController.buatRequest(idDonasi, self.app.current_user.id)
-            if result["status"] == "SUCCESS":
+            if result.get("status") == "SUCCESS":
                 messagebox.showinfo("Success", "Request sent!")
                 self.switch_menu("My Requests")
             else:
-                messagebox.showerror("Error", result["message"])
+                messagebox.showerror("Error", result.get("message", "Gagal request"))

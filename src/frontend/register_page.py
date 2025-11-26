@@ -3,7 +3,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 from PIL import Image
 import os
-from src.backend.api.client_api import api_register
+ 
 
 # Fallback import controller
 try:
@@ -175,8 +175,7 @@ class RegisterPage(ctk.CTkFrame):
         }
 
         try:
-            # result = AkunController.prosesRegistrasi(data)
-            result = api_register(nama,email,pw,phone,role)
+            result = AkunController.prosesRegistrasi(data)
             if result["status"] == "SUCCESS":
                 messagebox.showinfo("Success", f"Registrasi sebagai {role} berhasil! Silakan login.")
                 self.app.show_frame("LoginPage")

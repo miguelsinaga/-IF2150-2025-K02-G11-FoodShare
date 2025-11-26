@@ -144,7 +144,7 @@ class ProviderDashboard(ctk.CTkFrame):
 
         try:
             all_donasi_raw = DonasiController.semuaDonasi()
-        except AttributeError:
+        except Exception:
             all_donasi_raw = DonasiController.getDonasiAktif()
         
         my_all_donasi = []
@@ -216,7 +216,7 @@ class ProviderDashboard(ctk.CTkFrame):
 
         try:
             all_donasi_raw = DonasiController.semuaDonasi()
-        except AttributeError:
+        except Exception:
             all_donasi_raw = DonasiController.getDonasiAktif()
         
         current_user_id = str(self.app.current_user.id)

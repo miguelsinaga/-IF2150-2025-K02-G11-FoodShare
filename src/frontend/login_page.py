@@ -6,7 +6,6 @@ import os
 from flask import Flask,request,jsonify
 #from src.controller.account_controller_api import AkunControllerAPI as AccountController
 # Fallback import controller
-from src.backend.api.client_api import api_login
 from src.model.user import Pengguna
 from src.backend.user_data import UserRepo
 
@@ -275,30 +274,6 @@ class LoginPage(ctk.CTkFrame):
             return
 
         # 1. Coba login lewat API (konsisten dengan Register)
-        try:
-            api_res = api_login(email, pw)
-            if api_res.get("status") == "SUCCESS":
-                ud = api_res.get("user", {})
-                repo = UserRepo()
-                local = repo.find_by_email(ud.get("email"))
-                if not local:
-                    repo.save({
-                        "nama": ud.get("nama", ""),
-                        "email": ud.get("email", ""),
-                        "password_hash": ud.get("password_hash", ""),
-                        "noTelepon": ud.get("noTelepon", ""),
-                        "role": ud.get("role", "receiver"),
-                        "status": ud.get("status", "aktif")
-                    })
-                    local = repo.find_by_email(ud.get("email"))
-                user_obj = Pengguna(**local)
-                messagebox.showinfo("Success", "Login berhasil!")
-                self.app.login_success(user_obj)
-                return
-        except Exception:
-            pass
-
-        # 2. Fallback ke controller lokal (MySQL lokal)
         try:
             result = AkunController.prosesLogin(email, pw)
             if result.get("status") == "SUCCESS":

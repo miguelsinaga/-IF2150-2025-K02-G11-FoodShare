@@ -3,7 +3,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 from PIL import Image
 import os
-from src.backend.api.client_api import api_forgot_password
+ 
 # Fallback import controller
 try:
     from src.controller.account_controller import AkunController
@@ -197,12 +197,11 @@ class ForgotPassword(ctk.CTkFrame):
         }
 
         try:
-            # result = AkunController.LupaPassword(email, noTelepon,new_pass)
-            result = api_forgot_password(email,noTelepon,new_pass)
+            result = AkunController.LupaPassword(email, noTelepon,new_pass)
             if result["status"] == "SUCCESS":
-                messagebox.showinfo("Success", "Login berhasil!")
-                self.app.login_success(result.user)
+                messagebox.showinfo("Success", "Password berhasil direset. Silakan login.")
+                self.app.show_frame("LoginPage")
             else:
                 messagebox.showerror("Error", result["message"])
         except NameError:
-            messagebox.showinfo("Test Mode", f"Login UI Checked.\nEmail: {email}\nPass: {new_pass}")
+            messagebox.showinfo("Test Mode", f"Forgot Password UI Checked.\nEmail: {email}\nPass: {new_pass}")
