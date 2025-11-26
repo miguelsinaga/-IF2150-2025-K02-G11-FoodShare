@@ -1,18 +1,17 @@
+
 import tkinter as tk
 import customtkinter as ctk
-import os
 
 # Import halaman-halaman
-from src.output.login_page import LoginPage
-from src.output.register_page import RegisterPage
-from src.output.provider_dashboard import ProviderDashboard
-from src.output.receiver_dashboard import ReceiverDashboard
-from src.output.admin_dashboard import AdminDashboard
-
+from src.frontend.login_page import LoginPage
+from src.frontend.register_page import RegisterPage
+from src.frontend.provider_dashboard import ProviderDashboard
+from src.frontend.receiver_dashboard import ReceiverDashboard
+from src.frontend.admin_dashboard import AdminDashboard
+#from src.frontend.forgot_password import ForgotPassword
 # --- KONFIGURASI HD & TEMA ---
 ctk.set_appearance_mode("Light")        # Mode Terang (Sesuai desain hijau/putih Anda)
 ctk.set_default_color_theme("green")    # Tema warna default
-
 class MainApp(ctk.CTk):  # Ubah dari tk.Tk menjadi ctk.CTk
     def __init__(self):
         super().__init__()
@@ -40,6 +39,7 @@ class MainApp(ctk.CTk):  # Ubah dari tk.Tk menjadi ctk.CTk
 
         pages = (
             LoginPage,
+            #ForgotPassword,
             RegisterPage,
             ProviderDashboard,
             ReceiverDashboard,

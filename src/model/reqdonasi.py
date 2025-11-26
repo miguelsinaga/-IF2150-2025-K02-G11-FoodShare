@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from typing import Optional
 from datetime import datetime
-from src.backend.request import RequestRepo
+from src.backend.request_data import RequestRepo
 
 repo = RequestRepo()
 

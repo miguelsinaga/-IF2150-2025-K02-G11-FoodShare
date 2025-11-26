@@ -1,6 +1,6 @@
 from datetime import datetime
 from src.model.feedbackdonasi import Feedback
-from src.backend.feedback import FeedbackRepo
+from src.backend.feedback_data import FeedbackRepo
 
 repo = FeedbackRepo()
 

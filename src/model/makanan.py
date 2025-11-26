@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from typing import Optional
 from datetime import datetime
-from src.backend.datamakanan import DataMakananRepo
+from src.backend.makanan_data import DataMakananRepo
 
 repo = DataMakananRepo()
 

@@ -1,7 +1,7 @@
 # src/model/feedback.py
 from dataclasses import dataclass
 from datetime import datetime
-from src.backend.feedback import FeedbackRepo
+from src.backend.feedback_data import FeedbackRepo
 
 repo = FeedbackRepo()
 

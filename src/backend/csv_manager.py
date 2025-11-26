@@ -1,4 +1,3 @@
-# src/backend/csv_manager.py
 import csv
 import os
 import logging
@@ -12,7 +11,6 @@ class CSVManager:
         self.filepath = filepath
         self.header = header
 
-        # Ensure base folder exists
         base_folder = os.path.dirname(filepath)
         if base_folder and not os.path.exists(base_folder):
             try:
@@ -20,7 +18,6 @@ class CSVManager:
             except Exception:
                 logger.exception("Failed to create base folder for %s", filepath)
 
-        # Create file with header if missing
         if not os.path.exists(filepath):
             try:
                 with open(filepath, "w", newline="", encoding="utf-8") as f:
@@ -59,11 +56,9 @@ class CSVManager:
 
     def next_id(self) -> int:
         rows = self.read_all()
-        # rows[0] is header; find last non-empty row
         try:
             if len(rows) <= 1:
                 return 1
-            # get last data row
             last_row = rows[-1]
             last_id = int(last_row[0])
             return last_id + 1

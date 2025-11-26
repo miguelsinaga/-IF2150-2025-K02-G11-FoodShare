@@ -1,24 +1,35 @@
-.PHONY: install run clean setup
+APP_ENTRY_POINT = app.py
 
-# Target default (jalan saat ketik 'make' saja)
-all: run
+# Nama environment virtual (default uv)
+VENV_DIR = .venv
 
-# 1. Install dependencies (library)
+.PHONY: all install run clean test
+
+# Default target jika hanya mengetik 'make'
+all: install run
+
+# 1. Install dependencies (akan membaca pyproject.toml)
 install:
+	@echo "Installing dependencies with uv..."
 	uv sync
 
-# 2. Jalankan Aplikasi
+# 2. Menjalankan aplikasi
+# PYTHONPATH=. memastikan folder 'src' terbaca sebagai module
 run:
-	uv run python -m app
+	@echo "Running FoodShare App..."
+	uv run python $(APP_ENTRY_POINT)
 
-# 3. Bersihkan file cache (Opsional - syntax Windows)
+# 3. Menjalankan Testing (karena saya lihat ada folder tests)
+test:
+	@echo "Running tests..."
+	uv run pytest tests/
+
+# 4. Membersihkan file cache
 clean:
-	@echo "Membersihkan cache..."
-	@if exist __pycache__ rmdir /s /q __pycache__
-	@if exist .pytest_cache rmdir /s /q .pytest_cache
-	@echo "Selesai."
-
-# 4. Bantuan setup data (Mengingatkan user)
-setup:
-	@echo "Pastikan Anda sudah memindahkan file CSV ke folder 'tests/data'."
-	@echo "Gunakan perintah 'make install' lalu 'make run'."
+	@echo "Cleaning up..."
+	rm -rf __pycache__
+	rm -rf src/__pycache__
+	rm -rf src/backend/__pycache__
+	rm -rf .pytest_cache
+	# Hapus .venv jika ingin install ulang dari nol:
+	# rm -rf $(VENV_DIR)
