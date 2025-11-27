@@ -7,13 +7,15 @@ from PIL import Image
 import os
 import functools
 
+# Imports
 from src.frontend.side_menu import SideMenu
 from src.controller.donasi_controller import DonasiController
 from src.controller.request_controller import RequestController
 from src.controller.feedback_controller import FeedbackController
 from src.model.feedbackdonasi import Feedback
 from src.model.reqdonasi import RequestDonasi
-from src.constants.locations import BANDUNG_LOCATIONS
+# Mengambil konstanta lokasi dari File 1
+from src.constants.locations import BANDUNG_LOCATIONS 
 
 class ProviderDashboard(ctk.CTkFrame):
     def __init__(self, parent, app):
@@ -51,7 +53,8 @@ class ProviderDashboard(ctk.CTkFrame):
             "Active Stocks": "active.png",
             "New Requests": "newrequest.png",
             "On Delivery": "delivery.png",
-            "Total Donations": "completed.png"
+            "Total Donations": "completed.png",
+            "Total Portions Shared": "completed.png" # Fallback icon
         }
         
         for key, filename in icon_names.items():
@@ -86,11 +89,14 @@ class ProviderDashboard(ctk.CTkFrame):
         self.refresh_content()
 
     def refresh_content(self):
+        # 1. Update User Data
         try:
             from src.model.user import Pengguna
             self.app.current_user = Pengguna.find_by_id(self.app.current_user.id) or self.app.current_user
         except Exception:
             pass
+            
+        # 2. Check Basic Ban Status
         try:
             if str(getattr(self.app.current_user, "status", "")).lower() == "banned":
                 from tkinter import messagebox
@@ -100,6 +106,21 @@ class ProviderDashboard(ctk.CTkFrame):
                 return
         except Exception:
             pass
+
+        # 3. Check Provider Specific Role Status (From File 2 - Lebih Aman)
+        try:
+            if str(getattr(self.app.current_user, "role", "")).lower() == "provider":
+                from src.backend.donatur_data import DonaturRepo
+                dr = DonaturRepo().find_by_user_id(self.app.current_user.id)
+                if dr and str(dr.get("status_akun","aktif")).lower() != "aktif":
+                    from tkinter import messagebox
+                    messagebox.showerror("Akun Diblokir", "Akun provider Anda diblokir oleh admin.")
+                    self.app.current_user = None
+                    self.app.show_frame("LoginPage")
+                    return
+        except Exception:
+            pass
+
         for widget in self.content_frame.winfo_children(): widget.destroy()
         for widget in self.header_frame.winfo_children(): widget.destroy()
 
@@ -151,11 +172,12 @@ class ProviderDashboard(ctk.CTkFrame):
         self.show_dashboard_ui()
 
     # ==============================================================
-    # 1. DASHBOARD OVERVIEW 
+    # 1. DASHBOARD OVERVIEW (Merged Logic)
     # ==============================================================
     def render_overview(self):
         user = self.app.current_user
 
+        # Fetch Data
         try:
             all_donasi_raw = DonasiController.semuaDonasi()
         except Exception:
@@ -164,51 +186,87 @@ class ProviderDashboard(ctk.CTkFrame):
         my_all_donasi = []
         for d in all_donasi_raw:
             d_provider_id = getattr(d, 'idProvider', getattr(d, 'provider_id', getattr(d, 'id_provider', None)))
-            
             if d_provider_id is not None and str(d_provider_id) == str(user.id):
                 if getattr(d, 'status', '').lower() not in ["completed", "cancelled"]:
                     my_all_donasi.append(d)
 
         my_donasi_ids = [d.idDonasi for d in my_all_donasi]
-        
         all_requests = RequestController.semuaRequest()
         my_requests = [req for req in all_requests if req.idDonasi in my_donasi_ids]
         
+        # Calculate Counts
         count_active_stocks = sum(1 for d in my_all_donasi if getattr(d, 'status', 'N/A') == "Tersedia")
         count_pending = sum(1 for req in my_requests if req.status == "Pending")
         count_on_delivery = sum(1 for req in my_requests if req.status == "On Delivery")
-        count_completed = sum(1 for req in RequestController.getRequestByProviderId(user.id) if req.status == "Completed")
-        now = datetime.now()
-        def same_month(d):
-            if isinstance(d, (datetime, date)):
-                return d.year == now.year and d.month == now.month
-            try:
-                t = datetime.strptime(str(d)[:10], "%Y-%m-%d")
-                return t.year == now.year and t.month == now.month
-            except Exception:
-                return False
-        completed_this_month = sum(1 for req in RequestController.getRequestByProviderId(user.id) if req.status == "Completed" and same_month(req.tanggalRequest))
         
+        # Calculate Portions (Logic from File 2 - More detailed)
+        completed_or_sent = [req for req in RequestController.getRequestByProviderId(user.id) if req.status in ("Completed", "FeedbackSent")]
+        now = datetime.now()
+
+        def get_portion(req):
+            try:
+                # Assuming DonasiController or similar can fetch by ID, 
+                # or use existing list if optimized. Here using rudimentary lookup check
+                # Note: In real app, cleaner to use Controller.
+                from src.model.donasi import DataMakanan
+                don = DataMakanan.find_by_id(req.idDonasi)
+                return int(getattr(don, 'jumlahPorsi', 0)) if don else 0
+            except Exception:
+                return 0
+
+        portions_by_month = {}
+        total_portions = 0
+        
+        for r in completed_or_sent:
+            p = get_portion(r)
+            total_portions += p
+            try:
+                if isinstance(r.tanggalRequest, (datetime, date)):
+                    mk = f"{r.tanggalRequest.year:04d}-{r.tanggalRequest.month:02d}"
+                else:
+                    mk = str(r.tanggalRequest)[:7]
+            except Exception:
+                mk = "unknown"
+            portions_by_month[mk] = portions_by_month.get(mk, 0) + p
+            
+        current_month_key = f"{now.year:04d}-{now.month:02d}"
+        portions_this_month = portions_by_month.get(current_month_key, 0)
+        months_with_data = len([k for k in portions_by_month.keys() if k != "unknown"]) or 1
+        avg_monthly_portions = total_portions / months_with_data
+        
+        # --- UI RENDER ---
         stats_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
         stats_frame.pack(fill="x", pady=10)
 
         self.create_stat_card(stats_frame, "Active Stocks", str(count_active_stocks), "#132A13").pack(side="left", expand=True, fill="x", padx=5)
         self.create_stat_card(stats_frame, "New Requests", str(count_pending), "#132A13").pack(side="left", expand=True, fill="x", padx=5)
         self.create_stat_card(stats_frame, "On Delivery", str(count_on_delivery), "#132A13").pack(side="left", expand=True, fill="x", padx=5)
-        self.create_stat_card(stats_frame, "Total Donations", str(count_completed), "#132A13").pack(side="left", expand=True, fill="x", padx=5)
+        # Using Total Portions from File 2 as it's a better metric than just raw donation count
+        self.create_stat_card(stats_frame, "Total Portions Shared", str(total_portions), "#132A13").pack(side="left", expand=True, fill="x", padx=5)
 
         banner = ctk.CTkFrame(self.content_frame, fg_color="#DCEE85", corner_radius=10)
         banner.pack(fill="x", pady=30, ipady=10)
-        ctk.CTkLabel(banner, text=f"♻ You've helped share {completed_this_month} meals this month.", 
+        ctk.CTkLabel(banner, text=f"♻ You've shared {portions_this_month} portions this month.", 
                      text_color="#132A13", font=("Arial", 16, "bold")).pack(anchor="w", padx=20)
 
+        # Portion Summary (From File 2)
+        summary = ctk.CTkFrame(self.content_frame, fg_color="white", corner_radius=10)
+        summary.pack(fill="x", pady=10)
+        ctk.CTkLabel(summary, text="Portion Summary", font=("Arial", 18, "bold"), text_color="#132A13").pack(anchor="w", padx=20, pady=(15, 5))
+        row1 = ctk.CTkFrame(summary, fg_color="transparent")
+        row1.pack(fill="x", padx=20, pady=(0,10))
+        ctk.CTkLabel(row1, text=f"This Month: {portions_this_month}", text_color="#374151", font=("Arial", 14)).pack(side="left")
+        ctk.CTkLabel(row1, text=f"Avg Monthly: {avg_monthly_portions:.1f}", text_color="#374151", font=("Arial", 14)).pack(side="left", padx=25)
+        ctk.CTkLabel(row1, text=f"Total: {total_portions}", text_color="#374151", font=("Arial", 14)).pack(side="left", padx=25)
+
+        # Waste Reduction Report (From File 1 - Keep this feature)
         try:
             from src.model.laporandonasi import LaporanDonasi
             provider_reqs = RequestController.getRequestByProviderId(user.id)
-            completed_reqs = [r for r in provider_reqs if r.status in ["Completed", "FeedbackSent"]]
+            completed_reqs_for_report = [r for r in provider_reqs if r.status in ["Completed", "FeedbackSent"]]
             total_est = 0.0
             report_items = []
-            for r in completed_reqs[:5]:
+            for r in completed_reqs_for_report[:5]:
                 lap = LaporanDonasi(idLaporan=0, idRequest=r.idRequest, tanggalLaporan="", jenisLaporan="Donasi", deskripsi="")
                 est = lap.generateEstimasiPengurangan()
                 total_est += est
@@ -216,15 +274,16 @@ class ProviderDashboard(ctk.CTkFrame):
 
             report = ctk.CTkFrame(self.content_frame, fg_color="white", corner_radius=10)
             report.pack(fill="x", pady=10)
-            ctk.CTkLabel(report, text="Donation Report", font=("Arial", 18, "bold"), text_color="#132A13").pack(anchor="w", padx=20, pady=(15, 5))
-            ctk.CTkLabel(report, text=f"Estimated waste reduction: {total_est:.2f}", text_color="#374151").pack(anchor="w", padx=20)
+            ctk.CTkLabel(report, text="Environmental Impact", font=("Arial", 18, "bold"), text_color="#132A13").pack(anchor="w", padx=20, pady=(15, 5))
+            ctk.CTkLabel(report, text=f"Estimated waste reduction: {total_est:.2f} kg", text_color="#374151").pack(anchor="w", padx=20)
+            
             list_frame = ctk.CTkFrame(report, fg_color="transparent")
             list_frame.pack(fill="x", padx=20, pady=10)
             for rid, est in report_items:
                 row = ctk.CTkFrame(list_frame, fg_color="transparent")
                 row.pack(fill="x", pady=2)
                 ctk.CTkLabel(row, text=f"Request #{rid}", width=200, anchor="w").pack(side="left")
-                ctk.CTkLabel(row, text=f"Est. Reduction {est:.2f}", anchor="w").pack(side="left")
+                ctk.CTkLabel(row, text=f"Est. Reduction {est:.2f} kg", anchor="w").pack(side="left")
         except Exception:
             pass
 
@@ -491,7 +550,6 @@ class ProviderDashboard(ctk.CTkFrame):
 
     def render_feedback(self):
         # 1. Update Header & enforce auto-ban check
-        # Hapus widget lama di header frame agar bersih sebelum render ulang
         for widget in self.header_frame.winfo_children(): widget.destroy()
         try:
             from src.controller.feedback_controller import FeedbackController
@@ -504,34 +562,29 @@ class ProviderDashboard(ctk.CTkFrame):
 
         # 2. Persiapan Data
         try:
-            # Menggunakan method class Feedback yang sudah diimport di atas
             feedbacks = Feedback.by_provider(self.app.current_user.id)
         except AttributeError:
             feedbacks = []
 
-        # Hitung rata-rata menggunakan controller
+        # Hitung rata-rata
         avg = FeedbackController.hitungRataRataProvider(self.app.current_user.id)
         total_feedback = len(feedbacks) if feedbacks else 0
         
-        # Hitung pembulatan bintang untuk summary (skala 1–3)
         rounded = max(0, min(3, int(round(avg)))) if total_feedback > 0 else 0
         avg_text = f"{avg:.1f}" if total_feedback > 0 else "0.0"
 
-        # --- 3. Summary Card (Rating Rata-rata Besar) ---
+        # --- 3. Summary Card ---
         summary_card = ctk.CTkFrame(self.content_frame, fg_color="white", corner_radius=16, border_width=2, border_color="#E5E7EB")
         summary_card.pack(fill="x", pady=(0, 25), ipadx=25, ipady=25)
 
         summary_content = ctk.CTkFrame(summary_card, fg_color="transparent")
         summary_content.pack(anchor="w")
 
-        # Angka Rata-rata (Warna Oranye)
         ctk.CTkLabel(summary_content, text=avg_text, font=("Arial", 48, "bold"), text_color="#F6A836").pack(side="left", padx=(0, 20))
         
-        # Container Kanan (Bintang & Total Ulasan)
         right_summary = ctk.CTkFrame(summary_content, fg_color="transparent")
         right_summary.pack(side="left", anchor="c")
         
-        # Baris Bintang
         star_frame = ctk.CTkFrame(right_summary, fg_color="transparent")
         star_frame.pack(anchor="w", pady=(5,0))
         
@@ -542,7 +595,6 @@ class ProviderDashboard(ctk.CTkFrame):
         if stars_empty:
              ctk.CTkLabel(star_frame, text=stars_empty, font=("Arial", 24), text_color="#D1D5DB", pady=0).pack(side="left")
 
-        # Text Total Feedback
         ctk.CTkLabel(right_summary, text=f"Based on {total_feedback} feedback(s)", font=("Arial", 14), text_color="#6B7280").pack(anchor="w")
 
         # --- 4. Daftar List Feedback ---
@@ -550,7 +602,6 @@ class ProviderDashboard(ctk.CTkFrame):
         scroll.pack(fill="both", expand=True)
 
         if not feedbacks:
-            # Tampilan jika kosong
             empty_state = ctk.CTkFrame(scroll, fg_color="transparent")
             empty_state.pack(pady=40, fill="x")
             ctk.CTkLabel(empty_state, text="No feedback received yet.", font=("Arial", 16, "bold"), text_color="#374151").pack()
@@ -558,15 +609,12 @@ class ProviderDashboard(ctk.CTkFrame):
             return
 
         for fb in feedbacks:
-            # Kartu Feedback Individu
             card = ctk.CTkFrame(scroll, fg_color="white", corner_radius=16, border_width=2, border_color="#E5E7EB")
             card.pack(fill="x", pady=10, ipadx=20, ipady=20)
 
-            # Header Kartu (Nama Receiver & Bintang)
             header_row = ctk.CTkFrame(card, fg_color="transparent")
             header_row.pack(fill="x", pady=(0, 10))
 
-            # Nama Receiver (Menggunakan ID karena nama objek belum tersedia di model feedback)
             try:
                 from src.model.user import Pengguna
                 r = Pengguna.find_by_id(fb.idReceiver)
@@ -575,7 +623,6 @@ class ProviderDashboard(ctk.CTkFrame):
                 receiver_display = f"Receiver #{fb.idReceiver}"
             ctk.CTkLabel(header_row, text=receiver_display, font=("Arial", 16, "bold"), text_color="#111827").pack(side="left", anchor="w")
 
-            # Rating Bintang Individu (Kanan Atas)
             fb_rating = int(fb.rating)
             ind_stars_full = "★" * fb_rating
             ind_stars_empty = "☆" * (3 - fb_rating)
@@ -586,10 +633,7 @@ class ProviderDashboard(ctk.CTkFrame):
             if ind_stars_empty:
                  ctk.CTkLabel(star_container, text=ind_stars_empty, font=("Arial", 18), text_color="#D1D5DB").pack(side="left")
 
-            # Isi Komentar
             comment_text = fb.komentar if fb.komentar else "No comment provided."
-            
-            # Label Komentar dengan wrapping text agar tidak melebar keluar layar
             ctk.CTkLabel(card, text=comment_text, font=("Arial", 14), text_color="#374151", 
                          anchor="w", justify="left", wraplength=700).pack(fill="x")
 
@@ -682,7 +726,9 @@ class ProviderDashboard(ctk.CTkFrame):
             
         ctk.CTkFrame(parent, height=1, fg_color="#DDD").pack(fill="x")
 
-
+# =========================================================================
+# CLASS AddDonasiPopup (Using File 1 version for Dropdown Location)
+# =========================================================================
 class AddDonasiPopup(ctk.CTkToplevel):
     def __init__(self, parent, app_instance, refresh_callback, item_to_edit=None):
         super().__init__(parent)
@@ -732,6 +778,7 @@ class AddDonasiPopup(ctk.CTkToplevel):
         self.entry_porsi = ctk.CTkEntry(content, width=450, placeholder_text="Enter number of portions")
         self.entry_porsi.pack(anchor="w", pady=(0, 10))
 
+        # Using ComboBox from File 1 (Better UX)
         ctk.CTkLabel(content, text="Pickup Location (Address)", font=("Arial", 12, "bold"), text_color="#333").pack(anchor="w", pady=(5, 0))
         self.entry_lokasi = ctk.CTkComboBox(content, values=BANDUNG_LOCATIONS, width=450, state="readonly")
         self.entry_lokasi.pack(anchor="w", pady=(0, 10))

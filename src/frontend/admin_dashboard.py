@@ -41,7 +41,6 @@ class AdminDashboard(ctk.CTkFrame):
                 ("Dashboard", lambda: self.switch("Dashboard")),
                 ("Manage Users", lambda: self.switch("Manage Users")),
                 ("Manage Donations", lambda: self.switch("Manage Donations")),
-                ("Ban Audit", lambda: self.switch("Ban Audit")),
             ],
             active_item=self.current_menu
         )
@@ -55,8 +54,7 @@ class AdminDashboard(ctk.CTkFrame):
             self.render_users()
         elif self.current_menu == "Manage Donations":
             self.render_donations()
-        elif self.current_menu == "Ban Audit":
-            self.render_ban_audit()
+        
 
     def switch(self, menu):
         self.current_menu = menu
@@ -115,14 +113,28 @@ class AdminDashboard(ctk.CTkFrame):
         ctk.CTkLabel(row, text=user.email, width=widths[2], anchor="w", text_color="#333").pack(side="left", padx=10)
         ctk.CTkLabel(row, text=user.role, width=widths[3], anchor="w", text_color="#333").pack(side="left", padx=10)
 
-        if user.status == "aktif":
-            status_color = "#E6F4EA"
-            status_text_color = "#1E8E3E"
-            status_disp = "aktif"
+        # Tampilkan status untuk provider berdasarkan Donatur.status_akun
+        status_disp = user.status
+        status_color = "#E6F4EA"
+        status_text_color = "#1E8E3E"
+        if user.role == "provider":
+            try:
+                from src.backend.donatur_data import DonaturRepo
+                d = DonaturRepo().find_by_user_id(user.id)
+                if d and str(d.get("status_akun", "aktif")).lower() != "aktif":
+                    status_disp = "banned"
+                    status_color = "#FCE8E6"
+                    status_text_color = "#D93025"
+                else:
+                    status_disp = "aktif"
+                    status_color = "#E6F4EA"
+                    status_text_color = "#1E8E3E"
+            except Exception:
+                pass
         else:
-            status_color = "#FCE8E6"
-            status_text_color = "#D93025"
-            status_disp = user.status
+            if user.status != "aktif":
+                status_color = "#FCE8E6"
+                status_text_color = "#D93025"
         status_wrap = ctk.CTkFrame(row, fg_color=status_color, corner_radius=14, width=100, height=28)
         status_wrap.pack(side="left", padx=10)
         label_badge = ctk.CTkLabel(status_wrap, text=f"● {status_disp}", text_color=status_text_color, font=("Arial", 12))
@@ -133,24 +145,39 @@ class AdminDashboard(ctk.CTkFrame):
         ctk.CTkButton(action_frame, text="Edit", width=70, fg_color="#F6A836", hover_color="#E59930", text_color="white",
                       command=lambda: self.popup_edit_user(user)).pack(side="left", padx=5)
 
-        btn_text = "Ban" if user.status == "aktif" else "Active"
-        btn_col = "#EF4444" if user.status == "aktif" else "#10B981"
-        ctk.CTkButton(action_frame, text=btn_text, width=70, fg_color=btn_col, hover_color=btn_col, text_color="white",
-                      command=lambda: self.toggle_user_status(user)).pack(side="left", padx=5)
+        if user.role == "admin":
+            ctk.CTkLabel(action_frame, text="Admin protected", text_color="gray").pack(side="left", padx=5)
+        else:
+            btn_text = "Ban" if status_disp == "aktif" else "Active"
+            btn_col = "#EF4444" if status_disp == "aktif" else "#10B981"
+            ctk.CTkButton(action_frame, text=btn_text, width=70, fg_color=btn_col, hover_color=btn_col, text_color="white",
+                          command=lambda: self.toggle_user_status(user)).pack(side="left", padx=5)
 
         ctk.CTkFrame(parent, height=1, fg_color="#EEE").pack(fill="x")
 
     def toggle_user_status(self, user):
+        # Admin tidak dapat diban
+        if user.role == "admin":
+            messagebox.showinfo("Protected", "Admin tidak dapat diban.")
+            return
+        # Untuk provider: ubah status di DonaturRepo saja
+        if user.role == "provider":
+            from src.backend.donatur_data import DonaturRepo
+            repo = DonaturRepo()
+            d = repo.find_by_user_id(user.id)
+            current = str((d or {}).get("status_akun", "aktif")).lower()
+            new_status = "banned" if current == "aktif" else "aktif"
+            if messagebox.askyesno("Confirm", f"Change status of {user.nama} to {new_status}?"):
+                repo.update_status(user.id, new_status)
+                messagebox.showinfo("Success", f"Provider status updated to {new_status}")
+                self.render_ui()
+            return
+        # Non-provider: fallback ke users.status
         new_status = "banned" if user.status == "aktif" else "aktif"
         if messagebox.askyesno("Confirm", f"Change status of {user.nama} to {new_status}?"):
             user.status = new_status
             user.update()
-            try:
-                from src.backend.donatur_data import DonaturRepo
-                DonaturRepo().update_status(user.id, new_status)
-            except Exception:
-                pass
-            messagebox.showinfo("Success", f"Status updated to {new_status}")
+            messagebox.showinfo("Success", f"User status updated to {new_status}")
             self.render_ui()
 
     def popup_edit_user(self, user):
@@ -357,71 +384,8 @@ class EditDonationPopup(ctk.CTkToplevel):
         self.callback()
         self.destroy()
     def render_ban_audit(self):
-        ctk.CTkLabel(self.content, text="Ban Audit", font=("Arial", 24, "bold"), text_color="#132A13").pack(anchor="w", pady=(0, 20))
-
-        headers = ["Provider", "Avg Rating", "Feedback Count", "Status", "Action"]
-        widths = [250, 120, 140, 120, 220]
-        self.create_table_header(self.content, headers, widths)
-
-        scroll = ctk.CTkScrollableFrame(self.content, fg_color="white", corner_radius=10)
-        scroll.pack(fill="both", expand=True)
-
-        from src.model.user import Pengguna
-        from src.model.feedbackdonasi import Feedback
-        from src.controller.feedback_controller import FeedbackController
-
-        providers = [u for u in Pengguna.all() if u.role == "provider"]
-        for p in providers:
-            fbs = Feedback.by_provider(p.id)
-            count = len(fbs)
-            avg = (sum(f.rating for f in fbs) / count) if count > 0 else 0.0
-            try:
-                FeedbackController.check_and_ban_provider(p.id)
-            except Exception:
-                pass
-
-            row = ctk.CTkFrame(scroll, fg_color="transparent")
-            row.pack(fill="x", pady=5)
-            ctk.CTkLabel(row, text=f"{p.id} – {p.nama}", width=widths[0], anchor="w", text_color="#333").pack(side="left", padx=10)
-            ctk.CTkLabel(row, text=f"{avg:.2f}", width=widths[1], anchor="w", text_color="#333").pack(side="left", padx=10)
-            ctk.CTkLabel(row, text=str(count), width=widths[2], anchor="w", text_color="#333").pack(side="left", padx=10)
-
-            status_color = "#E6F4EA" if p.status == "aktif" else "#FCE8E6"
-            status_text_color = "#1E8E3E" if p.status == "aktif" else "#D93025"
-            status_wrap = ctk.CTkFrame(row, fg_color=status_color, corner_radius=14, width=widths[3], height=28)
-            status_wrap.pack(side="left", padx=10)
-            ctk.CTkLabel(status_wrap, text=f"● {p.status}", text_color=status_text_color, font=("Arial", 12)).place(relx=0.5, rely=0.5, anchor="center")
-
-            action_frame = ctk.CTkFrame(row, fg_color="transparent", width=widths[4])
-            action_frame.pack(side="left", fill="x", padx=10)
-
-            ctk.CTkButton(action_frame, text="Recalculate", width=90, fg_color="#132A13", hover_color="#1F381F", text_color="white",
-                          command=lambda uid=p.id: self.recalc_ban(uid)).pack(side="left", padx=5)
-            if p.status == "banned":
-                ctk.CTkButton(action_frame, text="Unban", width=70, fg_color="#10B981", hover_color="#059669", text_color="white",
-                              command=lambda u=p: self.manual_unban(u)).pack(side="left", padx=5)
-
-            ctk.CTkFrame(scroll, height=1, fg_color="#EEE").pack(fill="x")
-
+        pass
     def recalc_ban(self, uid: int):
-        try:
-            from src.controller.feedback_controller import FeedbackController
-            FeedbackController.check_and_ban_provider(uid)
-            from src.model.user import Pengguna
-            user = Pengguna.find_by_id(uid)
-            if user:
-                messagebox.showinfo("Done", f"Recalculated ban for {user.nama}. Status: {user.status}")
-            self.render_ui()
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
-
+        pass
     def manual_unban(self, user):
-        user.status = "aktif"
-        user.update()
-        try:
-            from src.backend.donatur_data import DonaturRepo
-            DonaturRepo().update_status(user.id, "aktif")
-        except Exception:
-            pass
-        messagebox.showinfo("Success", "User reactivated")
-        self.render_ui()
+        pass

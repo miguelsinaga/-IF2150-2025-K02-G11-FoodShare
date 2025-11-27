@@ -63,14 +63,9 @@ class FeedbackController:
         count = len(fbs)
         avg = (sum(f.rating for f in fbs) / count) if count > 0 else 0.0
         if count >= 5 and avg < 2:
-            from src.model.user import Pengguna
             from src.backend.donatur_data import DonaturRepo
-            user = Pengguna.find_by_id(provider_id)
-            if user and str(user.status).lower() != "banned":
-                user.status = "banned"
-                user.update()
-                try:
-                    DonaturRepo().update_status(provider_id, "banned")
-                except Exception:
-                    pass
-                logging.getLogger(__name__).info("auto_ban_provider provider_id=%s count=%s avg=%.2f", provider_id, count, avg)
+            try:
+                DonaturRepo().update_status(provider_id, "banned")
+            except Exception:
+                pass
+            logging.getLogger(__name__).info("auto_ban_provider provider_id=%s count=%s avg=%.2f", provider_id, count, avg)

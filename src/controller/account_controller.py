@@ -70,6 +70,15 @@ class AkunController:
         user = Pengguna(**user_data)
         if(user.password_hash != hash_password(password)):
             return {"status" : "FAIL" , "message" : "PASSWORD SALAH"}
+        # Cegah login jika provider diblokir via DonaturRepo
+        try:
+            if user.role == "provider":
+                from src.backend.donatur_data import DonaturRepo
+                dr = DonaturRepo().find_by_user_id(user.id)
+                if dr and str(dr.get("status_akun","aktif")).lower() != "aktif":
+                    return {"status": "FAIL", "message": "Akun provider Anda diblokir oleh admin."}
+        except Exception:
+            pass
         if str(user.status).lower() == "banned":
             return {"status": "FAIL", "message": "Akun Anda diblokir dan tidak dapat login."}
         user_dict = {
