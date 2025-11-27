@@ -4,10 +4,16 @@ from src.model.makanan import DataMakanan
 from src.backend.makanan_data import DataMakananRepo
 from src.controller.request_controller import RequestController
 from src.backend.donatur_data import DonaturRepo
+from src.constants.locations import BANDUNG_LOCATIONS
 
 repo = DataMakananRepo()
 
 class DonasiController:
+
+    @staticmethod
+    def is_valid_location(lokasi: str) -> bool:
+        """Validate if location is in allowed Bandung locations"""
+        return lokasi in BANDUNG_LOCATIONS
 
     @staticmethod
     def buatDonasi(idProvider: int, data: Dict) -> Dict:
@@ -20,6 +26,10 @@ class DonasiController:
             "batasWaktu": "YYYY-MM-DD"
         }
         """
+        # Validate location
+        if not DonasiController.is_valid_location(data["lokasi"]):
+            return {"status": "FAIL", "message": f"Lokasi '{data['lokasi']}' tidak valid. Silakan pilih dari daftar lokasi Bandung yang tersedia."}
+        
         did = repo.next_id()
 
         donasi = DataMakanan(
@@ -57,6 +67,10 @@ class DonasiController:
             "batasWaktu": "YYYY-MM-DD"
         }
         """
+        # Validate location
+        if not DonasiController.is_valid_location(data["lokasi"]):
+            return {"status": "FAIL", "message": f"Lokasi '{data['lokasi']}' tidak valid. Silakan pilih dari daftar lokasi Bandung yang tersedia."}
+        
         donasi = DataMakanan.find_by_id(data["idDonasi"])
         if not donasi:
             return {"status": "FAIL", "message": "Donasi tidak ditemukan"}

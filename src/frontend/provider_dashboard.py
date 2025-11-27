@@ -13,6 +13,7 @@ from src.controller.request_controller import RequestController
 from src.controller.feedback_controller import FeedbackController
 from src.model.feedbackdonasi import Feedback
 from src.model.reqdonasi import RequestDonasi
+from src.constants.locations import BANDUNG_LOCATIONS
 
 class ProviderDashboard(ctk.CTkFrame):
     def __init__(self, parent, app):
@@ -732,7 +733,7 @@ class AddDonasiPopup(ctk.CTkToplevel):
         self.entry_porsi.pack(anchor="w", pady=(0, 10))
 
         ctk.CTkLabel(content, text="Pickup Location (Address)", font=("Arial", 12, "bold"), text_color="#333").pack(anchor="w", pady=(5, 0))
-        self.entry_lokasi = ctk.CTkEntry(content, width=450, placeholder_text="Input Location")
+        self.entry_lokasi = ctk.CTkComboBox(content, values=BANDUNG_LOCATIONS, width=450, state="readonly")
         self.entry_lokasi.pack(anchor="w", pady=(0, 10))
         
         ctk.CTkLabel(content, text="Expiration Date (YYYY-MM-DD)", font=("Arial", 12, "bold"), text_color="#333").pack(anchor="w", pady=(5, 0))
@@ -745,8 +746,7 @@ class AddDonasiPopup(ctk.CTkToplevel):
         if self.mode == "edit":
             self.entry_jenis.insert(0, self.item_to_edit.jenisMakanan)
             self.entry_porsi.insert(0, str(self.item_to_edit.jumlahPorsi) if self.item_to_edit.jumlahPorsi is not None else "")
-            self.entry_lokasi.delete(0, 'end') 
-            self.entry_lokasi.insert(0, self.item_to_edit.lokasi)
+            self.entry_lokasi.set(self.item_to_edit.lokasi)
             self.entry_batas.insert(0, self.item_to_edit.batasWaktu)
         
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
