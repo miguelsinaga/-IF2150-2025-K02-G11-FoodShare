@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import messagebox
 import customtkinter as ctk
 from datetime import datetime, date
+import calendar
 from PIL import Image
 import os
 import functools
@@ -84,10 +85,22 @@ class ProviderDashboard(ctk.CTkFrame):
         self.refresh_content()
 
     def refresh_content(self):
-        for widget in self.content_frame.winfo_children():
-            widget.destroy()
-        for widget in self.header_frame.winfo_children():
-            widget.destroy()
+        try:
+            from src.model.user import Pengguna
+            self.app.current_user = Pengguna.find_by_id(self.app.current_user.id) or self.app.current_user
+        except Exception:
+            pass
+        try:
+            if str(getattr(self.app.current_user, "status", "")).lower() == "banned":
+                from tkinter import messagebox
+                messagebox.showerror("Akun Diblokir", "Akun Anda diblokir dan tidak dapat menggunakan dashboard.")
+                self.app.current_user = None
+                self.app.show_frame("LoginPage")
+                return
+        except Exception:
+            pass
+        for widget in self.content_frame.winfo_children(): widget.destroy()
+        for widget in self.header_frame.winfo_children(): widget.destroy()
 
         if self.current_menu == "Dashboard":
             self.render_header("Dashboard", "Overview of your activity")
@@ -164,6 +177,16 @@ class ProviderDashboard(ctk.CTkFrame):
         count_pending = sum(1 for req in my_requests if req.status == "Pending")
         count_on_delivery = sum(1 for req in my_requests if req.status == "On Delivery")
         count_completed = sum(1 for req in RequestController.getRequestByProviderId(user.id) if req.status == "Completed")
+        now = datetime.now()
+        def same_month(d):
+            if isinstance(d, (datetime, date)):
+                return d.year == now.year and d.month == now.month
+            try:
+                t = datetime.strptime(str(d)[:10], "%Y-%m-%d")
+                return t.year == now.year and t.month == now.month
+            except Exception:
+                return False
+        completed_this_month = sum(1 for req in RequestController.getRequestByProviderId(user.id) if req.status == "Completed" and same_month(req.tanggalRequest))
         
         stats_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
         stats_frame.pack(fill="x", pady=10)
@@ -175,8 +198,34 @@ class ProviderDashboard(ctk.CTkFrame):
 
         banner = ctk.CTkFrame(self.content_frame, fg_color="#DCEE85", corner_radius=10)
         banner.pack(fill="x", pady=30, ipady=10)
-        ctk.CTkLabel(banner, text="♻ You've helped share meals this month.", 
+        ctk.CTkLabel(banner, text=f"♻ You've helped share {completed_this_month} meals this month.", 
                      text_color="#132A13", font=("Arial", 16, "bold")).pack(anchor="w", padx=20)
+
+        try:
+            from src.model.laporandonasi import LaporanDonasi
+            provider_reqs = RequestController.getRequestByProviderId(user.id)
+            completed_reqs = [r for r in provider_reqs if r.status in ["Completed", "FeedbackSent"]]
+            total_est = 0.0
+            report_items = []
+            for r in completed_reqs[:5]:
+                lap = LaporanDonasi(idLaporan=0, idRequest=r.idRequest, tanggalLaporan="", jenisLaporan="Donasi", deskripsi="")
+                est = lap.generateEstimasiPengurangan()
+                total_est += est
+                report_items.append((r.idRequest, est))
+
+            report = ctk.CTkFrame(self.content_frame, fg_color="white", corner_radius=10)
+            report.pack(fill="x", pady=10)
+            ctk.CTkLabel(report, text="Donation Report", font=("Arial", 18, "bold"), text_color="#132A13").pack(anchor="w", padx=20, pady=(15, 5))
+            ctk.CTkLabel(report, text=f"Estimated waste reduction: {total_est:.2f}", text_color="#374151").pack(anchor="w", padx=20)
+            list_frame = ctk.CTkFrame(report, fg_color="transparent")
+            list_frame.pack(fill="x", padx=20, pady=10)
+            for rid, est in report_items:
+                row = ctk.CTkFrame(list_frame, fg_color="transparent")
+                row.pack(fill="x", pady=2)
+                ctk.CTkLabel(row, text=f"Request #{rid}", width=200, anchor="w").pack(side="left")
+                ctk.CTkLabel(row, text=f"Est. Reduction {est:.2f}", anchor="w").pack(side="left")
+        except Exception:
+            pass
 
 
     def create_stat_card(self, parent, title, value, bg_color):
@@ -203,10 +252,13 @@ class ProviderDashboard(ctk.CTkFrame):
         
         ctk.CTkLabel(header_frame, text="Available Food Items", font=("Arial", 20, "bold"), text_color="#132A13").pack(side="left")
         
-        ctk.CTkButton(header_frame, text="+ Add Availability", font=("Arial", 13, "bold"),
-                      fg_color="#F6A836", hover_color="#E59930", text_color="white",
-                      cursor="hand2", 
-                      command=self.popup_add_donasi).pack(side="right") 
+        if getattr(self.app.current_user, "status", "aktif") == "banned":
+            ctk.CTkLabel(header_frame, text="Account banned: actions disabled", text_color="#A16207").pack(side="right")
+        else:
+            ctk.CTkButton(header_frame, text="+ Add Availability", font=("Arial", 13, "bold"),
+                          fg_color="#F6A836", hover_color="#E59930", text_color="white",
+                          cursor="hand2", 
+                          command=self.popup_add_donasi).pack(side="right") 
 
         table_frame = ctk.CTkScrollableFrame(self.content_frame, fg_color="white", corner_radius=10)
         table_frame.pack(fill="both", expand=True)
@@ -369,8 +421,17 @@ class ProviderDashboard(ctk.CTkFrame):
         filtered_requests = all_requests_by_provider
         if self.request_filter != "All":
             filtered_requests = [
-                req for req in all_requests_by_provider if req.status == self.request_filter
+                req for req in all_requests_by_provider if req.status == self.request_filter or (self.request_filter == "Completed" and req.status in ["Completed", "FeedbackSent"]) 
             ]
+        def _to_dt(d):
+            from datetime import datetime
+            if hasattr(d, "strftime"):
+                return d
+            try:
+                return datetime.fromisoformat(str(d))
+            except Exception:
+                return datetime.min
+        filtered_requests = sorted(filtered_requests, key=lambda r: _to_dt(r.tanggalRequest), reverse=True)
 
         if not filtered_requests:
               ctk.CTkLabel(table_frame, text="Tidak ada permintaan makanan untuk saat ini.", font=("Arial", 14), text_color="gray").pack(pady=20)
@@ -399,6 +460,7 @@ class ProviderDashboard(ctk.CTkFrame):
             "Preparing": ("#E0F2FE", "#075985"), 
             "On Delivery": ("#DBEAFE", "#1E40AF"), 
             "Completed": ("#DCFCE7", "#166534"), 
+            "FeedbackSent": ("#DCFCE7", "#166534"), 
             "Rejected": ("#FEE2E2", "#B91C1C"), 
         }
         s_color, s_text = status_colors.get(req.status, ("#F3F4F6", "#6B7280"))
@@ -408,7 +470,9 @@ class ProviderDashboard(ctk.CTkFrame):
         action_frame = ctk.CTkFrame(row, fg_color="transparent", width=widths[5])
         action_frame.pack(side="left", fill="x", padx=10)
 
-        if req.status == "Pending":
+        if getattr(self.app.current_user, "status", "aktif") == "banned":
+            ctk.CTkLabel(action_frame, text="Account banned", text_color="gray").pack(side="left", padx=2)
+        elif req.status == "Pending":
             ctk.CTkButton(action_frame, text="Accept", width=70, fg_color="#10B981", hover_color="#059669", text_color="white", cursor="hand2", command=lambda: self.handle_request_action(req.idRequest, "Accept")).pack(side="left", padx=2)
             ctk.CTkButton(action_frame, text="Reject", width=70, fg_color="white", border_width=1, border_color="red", text_color="red", hover_color="#FEF2F2", cursor="hand2", command=lambda: self.handle_request_action(req.idRequest, "Reject")).pack(side="left", padx=2)
             
@@ -418,45 +482,115 @@ class ProviderDashboard(ctk.CTkFrame):
         elif req.status == "On Delivery":
             ctk.CTkButton(action_frame, text="Done", width=80, fg_color="#10B981", hover_color="#059669", text_color="white", cursor="hand2", command=lambda: self.handle_request_action(req.idRequest, "Completed")).pack(side="left", padx=2)
             
-        elif req.status in ["Completed", "Rejected"]:
+        elif req.status in ["Completed", "FeedbackSent", "Rejected"]:
             ctk.CTkLabel(action_frame, text="No Action Needed", text_color="gray").pack(side="left", padx=2)
             
         ctk.CTkFrame(parent, height=1, fg_color="#EEE").pack(fill="x")
 
 
     def render_feedback(self):
-        summary = ctk.CTkFrame(self.content_frame, fg_color="white", corner_radius=10, border_width=1, border_color="#DDD")
-        summary.pack(fill="x", pady=(0, 20), ipadx=20, ipady=20)
-        from src.controller.feedback_controller import FeedbackController
-        fbs = Feedback.by_provider(self.app.current_user.id)
-        avg = FeedbackController.hitungRataRataProvider(self.app.current_user.id)
-        avg_text = f"{avg:.1f}" if fbs else "-"
-        rounded = max(0, min(5, int(round(avg)))) if fbs else 0
-        stars = ("★ " * rounded + "☆ " * (5 - rounded)).strip()
-
-        ctk.CTkLabel(summary, text=avg_text, font=("Arial", 40, "bold"), text_color="#F6A836").pack(side="left", padx=20)
-        star_frame = ctk.CTkFrame(summary, fg_color="transparent")
-        star_frame.pack(side="left")
-        ctk.CTkLabel(star_frame, text=stars, font=("Arial", 20), text_color="#F6A836").pack(anchor="w")
-        ctk.CTkLabel(star_frame, text=f"Based on {len(fbs)} feedbacks", text_color="gray").pack(anchor="w")
-
-        scroll = ctk.CTkScrollableFrame(self.content_frame, fg_color="transparent")
-        scroll.pack(fill="both", expand=True)
-        
+        # 1. Update Header & enforce auto-ban check
+        # Hapus widget lama di header frame agar bersih sebelum render ulang
+        for widget in self.header_frame.winfo_children(): widget.destroy()
         try:
+            from src.controller.feedback_controller import FeedbackController
+            FeedbackController.check_and_ban_provider(self.app.current_user.id)
+            from src.model.user import Pengguna
+            self.app.current_user = Pengguna.find_by_id(self.app.current_user.id) or self.app.current_user
+        except Exception:
+            pass
+        self.render_header("Feedback", "See what receivers think about your donations")
+
+        # 2. Persiapan Data
+        try:
+            # Menggunakan method class Feedback yang sudah diimport di atas
             feedbacks = Feedback.by_provider(self.app.current_user.id)
         except AttributeError:
-            ctk.CTkLabel(scroll, text="No feedbacks available.", text_color="gray").pack(pady=20)
+            feedbacks = []
+
+        # Hitung rata-rata menggunakan controller
+        avg = FeedbackController.hitungRataRataProvider(self.app.current_user.id)
+        total_feedback = len(feedbacks) if feedbacks else 0
+        
+        # Hitung pembulatan bintang untuk summary (skala 1–3)
+        rounded = max(0, min(3, int(round(avg)))) if total_feedback > 0 else 0
+        avg_text = f"{avg:.1f}" if total_feedback > 0 else "0.0"
+
+        # --- 3. Summary Card (Rating Rata-rata Besar) ---
+        summary_card = ctk.CTkFrame(self.content_frame, fg_color="white", corner_radius=16, border_width=2, border_color="#E5E7EB")
+        summary_card.pack(fill="x", pady=(0, 25), ipadx=25, ipady=25)
+
+        summary_content = ctk.CTkFrame(summary_card, fg_color="transparent")
+        summary_content.pack(anchor="w")
+
+        # Angka Rata-rata (Warna Oranye)
+        ctk.CTkLabel(summary_content, text=avg_text, font=("Arial", 48, "bold"), text_color="#F6A836").pack(side="left", padx=(0, 20))
+        
+        # Container Kanan (Bintang & Total Ulasan)
+        right_summary = ctk.CTkFrame(summary_content, fg_color="transparent")
+        right_summary.pack(side="left", anchor="c")
+        
+        # Baris Bintang
+        star_frame = ctk.CTkFrame(right_summary, fg_color="transparent")
+        star_frame.pack(anchor="w", pady=(5,0))
+        
+        stars_full = "★" * rounded
+        stars_empty = "☆" * (3 - rounded)
+        
+        ctk.CTkLabel(star_frame, text=stars_full, font=("Arial", 24), text_color="#F6A836", pady=0).pack(side="left")
+        if stars_empty:
+             ctk.CTkLabel(star_frame, text=stars_empty, font=("Arial", 24), text_color="#D1D5DB", pady=0).pack(side="left")
+
+        # Text Total Feedback
+        ctk.CTkLabel(right_summary, text=f"Based on {total_feedback} feedback(s)", font=("Arial", 14), text_color="#6B7280").pack(anchor="w")
+
+        # --- 4. Daftar List Feedback ---
+        scroll = ctk.CTkScrollableFrame(self.content_frame, fg_color="transparent", label_anchor="w")
+        scroll.pack(fill="both", expand=True)
+
+        if not feedbacks:
+            # Tampilan jika kosong
+            empty_state = ctk.CTkFrame(scroll, fg_color="transparent")
+            empty_state.pack(pady=40, fill="x")
+            ctk.CTkLabel(empty_state, text="No feedback received yet.", font=("Arial", 16, "bold"), text_color="#374151").pack()
+            ctk.CTkLabel(empty_state, text="Wait for receivers to rate your donations.", font=("Arial", 14), text_color="#6B7280").pack()
             return
 
         for fb in feedbacks:
-            card = ctk.CTkFrame(scroll, fg_color="white", corner_radius=10, border_width=1, border_color="#DDD")
-            card.pack(fill="x", pady=10, ipadx=15, ipady=15)
-            h = ctk.CTkFrame(card, fg_color="transparent")
-            h.pack(fill="x")
-            ctk.CTkLabel(h, text=f"Receiver #{fb.idReceiver}", font=("Arial", 14, "bold"), text_color="#333").pack(side="left")
-            ctk.CTkLabel(h, text="★"*fb.rating, text_color="#F6A836").pack(side="right")
-            ctk.CTkLabel(card, text=fb.komentar, font=("Arial", 14), text_color="#555", anchor="w", justify="left").pack(fill="x", pady=(10, 0))
+            # Kartu Feedback Individu
+            card = ctk.CTkFrame(scroll, fg_color="white", corner_radius=16, border_width=2, border_color="#E5E7EB")
+            card.pack(fill="x", pady=10, ipadx=20, ipady=20)
+
+            # Header Kartu (Nama Receiver & Bintang)
+            header_row = ctk.CTkFrame(card, fg_color="transparent")
+            header_row.pack(fill="x", pady=(0, 10))
+
+            # Nama Receiver (Menggunakan ID karena nama objek belum tersedia di model feedback)
+            try:
+                from src.model.user import Pengguna
+                r = Pengguna.find_by_id(fb.idReceiver)
+                receiver_display = r.nama if r else f"Receiver #{fb.idReceiver}"
+            except Exception:
+                receiver_display = f"Receiver #{fb.idReceiver}"
+            ctk.CTkLabel(header_row, text=receiver_display, font=("Arial", 16, "bold"), text_color="#111827").pack(side="left", anchor="w")
+
+            # Rating Bintang Individu (Kanan Atas)
+            fb_rating = int(fb.rating)
+            ind_stars_full = "★" * fb_rating
+            ind_stars_empty = "☆" * (3 - fb_rating)
+            
+            star_container = ctk.CTkFrame(header_row, fg_color="transparent")
+            star_container.pack(side="right")
+            ctk.CTkLabel(star_container, text=ind_stars_full, font=("Arial", 18), text_color="#F6A836").pack(side="left")
+            if ind_stars_empty:
+                 ctk.CTkLabel(star_container, text=ind_stars_empty, font=("Arial", 18), text_color="#D1D5DB").pack(side="left")
+
+            # Isi Komentar
+            comment_text = fb.komentar if fb.komentar else "No comment provided."
+            
+            # Label Komentar dengan wrapping text agar tidak melebar keluar layar
+            ctk.CTkLabel(card, text=comment_text, font=("Arial", 14), text_color="#374151", 
+                         anchor="w", justify="left", wraplength=700).pack(fill="x")
 
     def render_profile(self):
         user = self.app.current_user
@@ -486,6 +620,11 @@ class ProviderDashboard(ctk.CTkFrame):
         btn_row = ctk.CTkFrame(card, fg_color="transparent")
         btn_row.pack(fill="x", padx=30, pady=(30, 0))
         ctk.CTkButton(btn_row, text="Save ✓", fg_color="#132A13", hover_color="#1F381F", text_color="white", width=100, height=35, corner_radius=20, command=self.save_profile).pack(side="right")
+
+        if str(user.status).lower() == "banned":
+            alert = ctk.CTkFrame(card, fg_color="#FEF9C3", corner_radius=10)
+            alert.pack(fill="x", padx=30, pady=(20, 0))
+            ctk.CTkLabel(alert, text="Your account is banned due to low ratings.", text_color="#A16207").pack(anchor="w", padx=15, pady=10)
 
     def save_profile(self):
         user = self.app.current_user
@@ -522,6 +661,8 @@ class ProviderDashboard(ctk.CTkFrame):
                 messagebox.showerror("Database Error", "Cannot connect to database. Please check if MySQL server is running.")
             else:
                 messagebox.showerror("Error", f"Failed to update profile: {error_msg}")
+
+    pass
 
     def create_table_header(self, parent, headers):
         header_frame = ctk.CTkFrame(parent, fg_color="#F9FAFB", height=40)
@@ -595,8 +736,11 @@ class AddDonasiPopup(ctk.CTkToplevel):
         self.entry_lokasi.pack(anchor="w", pady=(0, 10))
         
         ctk.CTkLabel(content, text="Expiration Date (YYYY-MM-DD)", font=("Arial", 12, "bold"), text_color="#333").pack(anchor="w", pady=(5, 0))
-        self.entry_batas = ctk.CTkEntry(content, width=450, placeholder_text=date.today().strftime("%Y-%m-%d"))
-        self.entry_batas.pack(anchor="w", pady=(0, 20))
+        date_row = ctk.CTkFrame(content, fg_color="transparent")
+        date_row.pack(anchor="w", pady=(0, 20))
+        self.entry_batas = ctk.CTkEntry(date_row, width=380, placeholder_text=date.today().strftime("%Y-%m-%d"))
+        self.entry_batas.pack(side="left")
+        ctk.CTkButton(date_row, text="Pick", width=60, fg_color="#F6A836", hover_color="#E59930", text_color="white", command=self.open_date_picker).pack(side="left", padx=10)
         
         if self.mode == "edit":
             self.entry_jenis.insert(0, self.item_to_edit.jenisMakanan)
@@ -613,6 +757,77 @@ class AddDonasiPopup(ctk.CTkToplevel):
         button_text = "Update Stock" if self.mode == "edit" else "Save Stock"
         ctk.CTkButton(btn_frame, text=button_text, fg_color="#F6A836", hover_color="#E59930", 
                       text_color="white", width=100, command=self.save_or_update_donasi).pack(side="right")
+
+    def open_date_picker(self):
+        self.dp_year = datetime.now().year
+        self.dp_month = datetime.now().month
+        self.dp = ctk.CTkToplevel(self)
+        self.dp.title("Select Date")
+        self.dp.resizable(False, False)
+        self.dp.transient(self)
+        self.dp.grab_set()
+        try:
+            self.dp.focus_force()
+        except Exception:
+            pass
+        wrap = ctk.CTkFrame(self.dp, fg_color="#FFFFFF")
+        wrap.pack(padx=15, pady=15)
+        head = ctk.CTkFrame(wrap, fg_color="transparent")
+        head.pack(fill="x")
+        ctk.CTkButton(head, text="<", width=30, command=lambda: self.shift_month(-1)).pack(side="left")
+        self.dp_label = ctk.CTkLabel(head, text=self.month_label(), font=("Arial", 14, "bold"))
+        self.dp_label.pack(side="left", padx=10)
+        ctk.CTkButton(head, text=">", width=30, command=lambda: self.shift_month(1)).pack(side="left")
+        self.grid_frame = ctk.CTkFrame(wrap, fg_color="transparent")
+        self.grid_frame.pack(pady=10)
+        foot = ctk.CTkFrame(wrap, fg_color="transparent")
+        foot.pack(fill="x")
+        ctk.CTkButton(foot, text="Today", width=80, command=self.pick_today).pack(side="left")
+        self.render_calendar()
+
+    def month_label(self):
+        return f"{calendar.month_name[self.dp_month]} {self.dp_year}"
+
+    def shift_month(self, delta):
+        m = self.dp_month + delta
+        y = self.dp_year
+        if m < 1:
+            m = 12
+            y -= 1
+        elif m > 12:
+            m = 1
+            y += 1
+        self.dp_month = m
+        self.dp_year = y
+        self.dp_label.configure(text=self.month_label())
+        self.render_calendar()
+
+    def render_calendar(self):
+        for w in self.grid_frame.winfo_children():
+            w.destroy()
+        days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
+        for i, d in enumerate(days):
+            ctk.CTkLabel(self.grid_frame, text=d, width=50).grid(row=0, column=i, padx=2, pady=2)
+        weeks = calendar.monthcalendar(self.dp_year, self.dp_month)
+        for r, week in enumerate(weeks, start=1):
+            for c, day in enumerate(week):
+                txt = "" if day == 0 else str(day)
+                btn = ctk.CTkButton(self.grid_frame, text=txt or " ", width=50, cursor="hand2", command=lambda d=day: self.pick_day(d))
+                btn.grid(row=r, column=c, padx=2, pady=2)
+
+    def pick_day(self, day):
+        if day == 0:
+            return
+        val = f"{self.dp_year}-{self.dp_month:02d}-{day:02d}"
+        self.entry_batas.delete(0, 'end')
+        self.entry_batas.insert(0, val)
+        self.dp.destroy()
+
+    def pick_today(self):
+        t = datetime.now().strftime("%Y-%m-%d")
+        self.entry_batas.delete(0, 'end')
+        self.entry_batas.insert(0, t)
+        self.dp.destroy()
         
     def save_or_update_donasi(self):
         try:

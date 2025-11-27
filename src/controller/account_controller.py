@@ -40,20 +40,21 @@ class AkunController:
         if v.get("status") != "SUCCESS":
             return v
         
-        if repo.find_by_email(data["email"]):
+        email_norm = data["email"].strip().lower()
+        if repo.find_by_email(email_norm):
             return {"status": "FAIL", "message": "Email sudah terdaftar"}
 
         #user_id = repo.next_id()
         user_data = {
             "nama": data["nama"],
-            "email": data["email"],
+            "email": email_norm,
             "password_hash": hash_password(data["password"]),
             "noTelepon": data.get("noTelepon", ""),
             "role": data.get("role", "receiver"),
             "status": "aktif"
         }
         repo.save(user_data)
-        new_user = repo.find_by_email(data['email'])
+        new_user = repo.find_by_email(email_norm)
         
         user = Pengguna(**new_user)
         return {"status": "SUCCESS", "message": "Registrasi berhasil", "user": user}
@@ -61,7 +62,7 @@ class AkunController:
     @staticmethod
     def prosesLogin(email: str, password: str) -> Dict :
         
-        user_data = repo.find_by_email(email)
+        user_data = repo.find_by_email(email.strip().lower())
 
         if not user_data :
             return {"status" : "FAIL","message" : "login gagal" }
@@ -69,6 +70,8 @@ class AkunController:
         user = Pengguna(**user_data)
         if(user.password_hash != hash_password(password)):
             return {"status" : "FAIL" , "message" : "PASSWORD SALAH"}
+        if str(user.status).lower() == "banned":
+            return {"status": "FAIL", "message": "Akun Anda diblokir dan tidak dapat login."}
         user_dict = {
             "id": user.id,
             "nama": user.nama,

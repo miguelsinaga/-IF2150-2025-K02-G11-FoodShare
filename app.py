@@ -72,8 +72,38 @@ class MainApp(ctk.CTk):  # Ubah dari tk.Tk menjadi ctk.CTk
     def login_success(self, user):
         self.current_user = user
         print(f"Login berhasil sebagai: {user.role}")
+        try:
+            from tkinter import messagebox
+        except Exception:
+            pass
+        # Jika akun banned → paksa logout dengan pesan
+        if str(getattr(user, "status", "")).lower() == "banned":
+            try:
+                messagebox.showerror("Akun Diblokir", "Akun Anda diblokir dan tidak dapat login.")
+            except Exception:
+                pass
+            self.current_user = None
+            self.show_frame("LoginPage")
+            return
 
         if user.role == "provider":
+            try:
+                from src.controller.feedback_controller import FeedbackController
+                FeedbackController.check_and_ban_provider(user.id)
+                from src.model.user import Pengguna
+                updated = Pengguna.find_by_id(user.id)
+                if updated:
+                    self.current_user = updated
+                if str(getattr(self.current_user, "status", "")).lower() == "banned":
+                    try:
+                        messagebox.showerror("Akun Diblokir", "Akun Anda diblokir dan tidak dapat login.")
+                    except Exception:
+                        pass
+                    self.current_user = None
+                    self.show_frame("LoginPage")
+                    return
+            except Exception:
+                pass
             self.show_frame("ProviderDashboard")
         elif user.role == "receiver":
             self.show_frame("ReceiverDashboard")

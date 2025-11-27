@@ -3,6 +3,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 import os
 import hashlib
+import logging
 from PIL import Image
 
 from src.frontend.side_menu import SideMenu
@@ -18,6 +19,7 @@ class ReceiverDashboard(ctk.CTkFrame):
         self.app = app
         self.current_menu = "Dashboard"
         self.icon_cache = {}
+        self.my_request_filter = "All"
 
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -92,6 +94,16 @@ class ReceiverDashboard(ctk.CTkFrame):
         self.show_dashboard_ui()
 
     def refresh_content(self):
+        # Guard: if account banned, force logout
+        try:
+            if str(getattr(self.app.current_user, "status", "")).lower() == "banned":
+                from tkinter import messagebox
+                messagebox.showerror("Akun Diblokir", "Akun Anda diblokir dan tidak dapat menggunakan dashboard.")
+                self.app.current_user = None
+                self.app.show_frame("LoginPage")
+                return
+        except Exception:
+            pass
         # Clear both header and content
         for widget in self.header_frame.winfo_children(): widget.destroy()
         for widget in self.content_frame.winfo_children(): widget.destroy()
@@ -234,7 +246,13 @@ class ReceiverDashboard(ctk.CTkFrame):
         img_ph.pack(fill="x", padx=15, pady=15)
         
         ctk.CTkLabel(card, text=donasi.jenisMakanan, font=("Arial", 16, "bold"), text_color="white", anchor="w").pack(fill="x", padx=15)
-        ctk.CTkLabel(card, text=f"Provider #{donasi.idProvider}", font=("Arial", 12), text_color="#A0B0A0", anchor="w").pack(fill="x", padx=15)
+        try:
+            from src.model.user import Pengguna
+            p = Pengguna.find_by_id(donasi.idProvider)
+            provider_display = p.nama if p else f"Provider #{donasi.idProvider}"
+        except Exception:
+            provider_display = f"Provider #{donasi.idProvider}"
+        ctk.CTkLabel(card, text=provider_display, font=("Arial", 12), text_color="#A0B0A0", anchor="w").pack(fill="x", padx=15)
         
         detail_text = f"Portions: {donasi.jumlahPorsi}\nExpires: {donasi.batasWaktu}\nLoc: {donasi.lokasi}"
         ctk.CTkLabel(card, text=detail_text, font=("Arial", 12), text_color="white", justify="left", anchor="w").pack(fill="x", padx=15, pady=10)
@@ -247,10 +265,52 @@ class ReceiverDashboard(ctk.CTkFrame):
         
         return card
 
+    def do_request(self, idDonasi):
+        if messagebox.askyesno("Confirm", "Request this food?"):
+            result = RequestController.buatRequest(idDonasi, self.app.current_user.id)
+            if result.get("status") == "SUCCESS":
+                messagebox.showinfo("Success", "Request sent!")
+                self.switch_menu("My Requests")
+            else:
+                messagebox.showerror("Error", result.get("message", "Gagal request"))
+
     def render_my_requests(self):
+        filter_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
+        filter_frame.pack(anchor="w", pady=(0, 10))
+        filter_map = {
+            "All": "All",
+            "Pending": "Pending",
+            "Preparing": "Preparing",
+            "On Delivery": "On Delivery",
+            "Completed": "Completed",
+            "Feedback Sent": "FeedbackSent",
+        }
+        for ui_label, status_value in filter_map.items():
+            is_active = (status_value == self.my_request_filter)
+            fg = "#132A13" if is_active else "white"
+            tc = "white" if is_active else "#132A13"
+            hover = "#1F381F" if is_active else "#F0F0F0"
+            ctk.CTkButton(filter_frame, text=ui_label, fg_color=fg, text_color=tc, width=110, corner_radius=20, border_width=1, border_color="#DDD", hover_color=hover, cursor="hand2", command=lambda s=status_value: self.set_my_request_filter(s)).pack(side="left", padx=5)
+
         scroll = ctk.CTkScrollableFrame(self.content_frame, fg_color="transparent")
-        scroll.pack(fill="both", expand=True, pady=20)
-        my_reqs = [r for r in RequestController.semuaRequest() if str(r.idReceiver) == str(self.app.current_user.id)]
+        scroll.pack(fill="both", expand=True, pady=10)
+        info = ctk.CTkFrame(scroll, fg_color="#F9FAFB")
+        info.pack(fill="x", padx=10, pady=(0,10))
+        ctk.CTkLabel(info, text="Once your request is completed, tap 'Rate / Feedback' to submit your review.", text_color="#6B7280").pack(anchor="w", padx=10, pady=8)
+        my_reqs_all = [r for r in RequestController.semuaRequest() if str(r.idReceiver) == str(self.app.current_user.id)]
+        if self.my_request_filter != "All":
+            my_reqs = [r for r in my_reqs_all if r.status == self.my_request_filter or (self.my_request_filter == "Completed" and r.status == "Completed")]
+        else:
+            my_reqs = my_reqs_all
+        def _to_dt(d):
+            from datetime import datetime
+            if hasattr(d, "strftime"):
+                return d
+            try:
+                return datetime.fromisoformat(str(d))
+            except Exception:
+                return datetime.min
+        my_reqs = sorted(my_reqs, key=lambda r: _to_dt(r.tanggalRequest), reverse=True)
         for req in my_reqs:
             card = ctk.CTkFrame(scroll, fg_color="#132A13", corner_radius=10)
             card.pack(fill="x", pady=10)
@@ -266,175 +326,156 @@ class ReceiverDashboard(ctk.CTkFrame):
                 s_text = "Waiting Confirmation"
             else:
                 s_text = req.status
-                if req.status == "Completed":
+                if req.status in ["Completed", "FeedbackSent"]:
                     s_color, s_fg = "#DCFCE7", "#166534"
             ctk.CTkLabel(status_frame, text=s_text, fg_color=s_color, text_color=s_fg, corner_radius=10, width=150, height=30).pack()
 
-            if req.status == "Completed":
-                ctk.CTkButton(status_frame, text="Give Feedback", fg_color="#F6A836", hover_color="#E59930", text_color="white", cursor="hand2",
-                               command=lambda r=req: self.open_feedback_popup(r)).pack(pady=10)
+            if s_text == "FeedbackSent":
+                ctk.CTkLabel(status_frame, text="Feedback sent", text_color="gray").pack(pady=10)
+            elif s_text == "Completed":
+                ctk.CTkButton(status_frame, text="Rate / Feedback", fg_color="#F6A836", hover_color="#E59930", text_color="white", cursor="hand2",
+                               command=lambda r=req: self.popup_feedback(r)).pack(pady=10)
+
+    def set_my_request_filter(self, s):
+        self.my_request_filter = s
+        self.refresh_content()
 
     def render_feedback(self):
+        # Update header subtitle agar sesuai dengan gaya Figma
+        for widget in self.header_frame.winfo_children(): widget.destroy()
+        self.render_header("Feedback", "Reviews and ratings you've given to donors")
+        
         scroll = ctk.CTkScrollableFrame(self.content_frame, fg_color="transparent")
-        scroll.pack(fill="both", expand=True, pady=20)
-        feedbacks = Feedback.by_receiver(self.app.current_user.id)
-        if not feedbacks:
-            ctk.CTkLabel(scroll, text="No feedback yet.", text_color="gray").pack(pady=20)
-            return
-        for fb in feedbacks:
-            card = ctk.CTkFrame(scroll, fg_color="white", border_width=1, border_color="#DDD")
-            card.pack(fill="x", pady=10, ipadx=20, ipady=20)
-            ctk.CTkLabel(card, text=f"To Provider #{fb.idProvider}", font=("Arial", 14, "bold"), text_color="#132A13").pack(anchor="w")
-            ctk.CTkLabel(card, text="★" * fb.rating, text_color="#F6A836").pack(anchor="w")
-            ctk.CTkLabel(card, text=fb.komentar, text_color="#555").pack(anchor="w", pady=(5, 0))
-
-    def open_feedback_popup(self, req):
-        popup = ctk.CTkToplevel(self)
-        popup.title("Give Feedback")
-        popup.transient(self)
-        popup.grab_set()
-        popup.resizable(False, False)
-        frame = ctk.CTkFrame(popup, fg_color="#FFFFFF")
-        frame.pack(padx=20, pady=20, fill="x")
-        ctk.CTkLabel(frame, text="Rating (1-5)", text_color="#132A13").pack(anchor="w")
-        rating_entry = ctk.CTkEntry(frame)
-        rating_entry.pack(fill="x", pady=5)
-        ctk.CTkLabel(frame, text="Comment", text_color="#132A13").pack(anchor="w")
-        comment_entry = ctk.CTkEntry(frame)
-        comment_entry.pack(fill="x", pady=5)
-
-        def submit():
-            try:
-                rating = int(rating_entry.get().strip())
-            except Exception:
-                messagebox.showerror("Error", "Rating harus angka 1-3")
-                return
-            if rating not in [1,2,3,4,5]:
-                messagebox.showerror("Error", "Rating harus 1-3")
-                return
-            komentar = comment_entry.get().strip()
-            don = DataMakanan.find_by_id(req.idDonasi)
-            if not don:
-                messagebox.showerror("Error", "Data donasi tidak ditemukan")
-                return
-            res = FeedbackController.kirimFeedback(don.idProvider, self.app.current_user.id, rating, komentar)
-            if res.get("status") == "SUCCESS":
-                messagebox.showinfo("Success", "Feedback terkirim")
-                popup.destroy()
-                self.switch_menu("Feedback")
-            else:
-                messagebox.showerror("Error", res.get("message", "Gagal mengirim feedback"))
-
-        ctk.CTkButton(frame, text="Submit", fg_color="#132A13", text_color="white", command=submit).pack(pady=10)
-
-    def render_profile(self):
-        user = self.app.current_user
-        scroll = ctk.CTkScrollableFrame(self.content_frame, fg_color="transparent")
-        scroll.pack(fill="both", expand=True)
-        
-        # Profile card
-        card = ctk.CTkFrame(scroll, fg_color="white", corner_radius=15, border_width=1, border_color="#EEE")
-        card.pack(fill="x", ipady=20, padx=5)
-        
-        def create_field(parent, label_text, value):
-            row = ctk.CTkFrame(parent, fg_color="transparent")
-            row.pack(fill="x", padx=30, pady=10)
-            ctk.CTkLabel(
-                row, 
-                text=label_text, 
-                font=("Arial", 14, "bold"), 
-                text_color="#333", 
-                width=150, 
-                anchor="w"
-            ).pack(side="left", anchor="n", pady=5)
-            entry = ctk.CTkEntry(
-                row, 
-                height=40, 
-                corner_radius=8, 
-                fg_color="transparent", 
-                border_color="#CCC", 
-                text_color="#333"
-            )
-            entry.insert(0, value)
-            entry.pack(side="left", fill="x", expand=True)
-            return entry
-
-        # Profile fields
-        self.entry_name = create_field(card, "Name", user.nama)
-        self.entry_phone = create_field(card, "Contact Number", user.noTelepon)
-        self.entry_email = create_field(card, "Email", user.email)
-        
-        # Divider
-        ctk.CTkFrame(card, height=1, fg_color="#EEE").pack(fill="x", pady=20, padx=30)
-        
-        # Password change section
-        ctk.CTkLabel(
-            card, 
-            text="Change Password", 
-            font=("Arial", 14, "bold"), 
-            text_color="#333"
-        ).pack(anchor="w", padx=30)
-        
-        self.entry_new_pass = ctk.CTkEntry(
-            card, 
-            placeholder_text="New Password (leave empty to keep current)", 
-            show="*", 
-            height=40, 
-            corner_radius=8, 
-            fg_color="transparent", 
-            border_color="#CCC", 
-            text_color="#333"
-        )
-        self.entry_new_pass.pack(fill="x", padx=(180, 30), pady=5)
-        
-        # Save button
-        btn_row = ctk.CTkFrame(card, fg_color="transparent")
-        btn_row.pack(fill="x", padx=30, pady=(30, 0))
-        
-        ctk.CTkButton(
-            btn_row, 
-            text="Save Changes ✓", 
-            fg_color="#132A13", 
-            hover_color="#1F381F", 
-            text_color="white", 
-            width=120, 
-            height=35, 
-            corner_radius=20, 
-            command=self.save_profile
-        ).pack(side="right")
-
-    def save_profile(self):
-        user = self.app.current_user
-        
-        # Validation
-        if not self.entry_name.get().strip():
-            messagebox.showerror("Error", "Name cannot be empty!")
-            return
-        
-        if not self.entry_email.get().strip():
-            messagebox.showerror("Error", "Email cannot be empty!")
-            return
+        scroll.pack(fill="both", expand=True, pady=(10, 0))
         
         try:
-            # Update basic info
-            user.nama = self.entry_name.get().strip()
-            user.noTelepon = self.entry_phone.get().strip()
-            user.email = self.entry_email.get().strip()
+            feedbacks = Feedback.by_receiver(self.app.current_user.id)
+        except Exception:
+            feedbacks = []
             
-            # Update password if provided
-            new_password = self.entry_new_pass.get()
-            if new_password:
-                user.password_hash = hashlib.sha256(new_password.encode()).hexdigest()
-            
-            # Save to database
-            user.update()
-            
-            messagebox.showinfo("Success", "Profile updated successfully!")
-            self.entry_new_pass.delete(0, 'end')
-            self.refresh_content()
-            
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to update profile: {str(e)}")
+        if not feedbacks:
+            # Tampilan kosong yang lebih rapi
+            empty_frame = ctk.CTkFrame(scroll, fg_color="transparent")
+            empty_frame.pack(pady=40, fill="x")
+            ctk.CTkLabel(empty_frame, text="You haven't given any feedback yet.", font=("Arial", 16, "bold"), text_color="#374151").pack()
+            ctk.CTkLabel(empty_frame, text="Your reviews will appear here once submitted.", font=("Arial", 14), text_color="#6B7280").pack(pady=(5,0))
+            return
+
+        for fb in feedbacks:
+            # Kartu Feedback Individu (Konsisten dengan gaya Provider)
+            card = ctk.CTkFrame(scroll, fg_color="white", corner_radius=16, border_width=2, border_color="#E5E7EB")
+            card.pack(fill="x", pady=10, ipadx=20, ipady=20)
+
+            # Header Kartu (Nama Provider & Bintang)
+            header_row = ctk.CTkFrame(card, fg_color="transparent")
+            header_row.pack(fill="x", pady=(0, 10))
+
+            # Nama Provider (Bold)
+            # Catatan: Menggunakan ID karena nama asli provider tidak tersedia langsung di objek feedback.
+            try:
+                from src.model.user import Pengguna
+                p = Pengguna.find_by_id(fb.idProvider)
+                provider_display = p.nama if p else f"Provider #{fb.idProvider}"
+            except Exception:
+                provider_display = f"Provider #{fb.idProvider}"
+            ctk.CTkLabel(header_row, text=f"To {provider_display}", font=("Arial", 16, "bold"), text_color="#111827").pack(side="left", anchor="w")
+
+            # Rating Bintang Individu (Kanan Atas)
+            fb_rating = int(fb.rating)
+            ind_stars_full = "★" * fb_rating
+            ind_stars_empty = "☆" * (3 - fb_rating)
+
+            star_container = ctk.CTkFrame(header_row, fg_color="transparent")
+            star_container.pack(side="right")
+            ctk.CTkLabel(star_container, text=ind_stars_full, font=("Arial", 18), text_color="#F6A836").pack(side="left")
+            if ind_stars_empty:
+                 ctk.CTkLabel(star_container, text=ind_stars_empty, font=("Arial", 18), text_color="#D1D5DB").pack(side="left")
+
+            # Isi Komentar
+            comment_text = fb.komentar if fb.komentar else ""
+            if comment_text:
+                 ctk.CTkLabel(card, text=comment_text, font=("Arial", 14), text_color="#374151", anchor="w", justify="left", wraplength=800).pack(fill="x")
+            else:
+                 ctk.CTkLabel(card, text="No written review provided.", font=("Arial", 14, "italic"), text_color="#9CA3AF", anchor="w").pack(fill="x")
+
+    def popup_feedback(self, req):
+        FeedbackPopup(self.app.master, req, self.app.current_user.id)
+
+class FeedbackPopup(ctk.CTkToplevel):
+    def __init__(self, parent, request_obj, receiver_id):
+        super().__init__(parent)
+        self.request_obj = request_obj
+        self.receiver_id = receiver_id
+        self.title("Give Feedback")
+        self.geometry("400x400")
+        donasi = DataMakanan.find_by_id(request_obj.idDonasi)
+        self.provider_id = donasi.idProvider if donasi else 0
+        ctk.CTkLabel(self, text="Rate your experience", font=("Arial", 18, "bold")).pack(pady=20)
+
+        stars_frame = ctk.CTkFrame(self, fg_color="transparent")
+        stars_frame.pack(pady=10)
+        self.rating = 3
+        self.star_buttons = []
+        def set_rating(n):
+            self.rating = n
+            for i, btn in enumerate(self.star_buttons, start=1):
+                filled = i <= n
+                btn.configure(text="★" if filled else "☆", text_color="#F6A836" if filled else "#9CA3AF")
+            self.lbl_val.configure(text=f"{n} Stars (1–3)")
+        for i in range(1,4):
+            b = ctk.CTkButton(stars_frame, width=28, height=28, fg_color="white", border_width=1, border_color="#DDD",
+                               text="★" if i<=3 else "☆", text_color="#F6A836", command=lambda n=i: set_rating(n))
+            b.pack(side="left", padx=3)
+            self.star_buttons.append(b)
+        self.lbl_val = ctk.CTkLabel(self, text="3 Stars (1–3)")
+        self.lbl_val.pack()
+
+        self.placeholder_text = "Write your comment (optional)..."
+        self.txt_comment = ctk.CTkTextbox(self, height=100, width=300)
+        self.txt_comment.pack(pady=10)
+        self.txt_comment.insert("1.0", self.placeholder_text)
+        self.placeholder_active = True
+        def on_focus_in(event):
+            if self.placeholder_active:
+                self.txt_comment.delete("1.0", "end")
+                self.placeholder_active = False
+        def on_focus_out(event):
+            content = self.txt_comment.get("1.0", "end").strip()
+            if not content:
+                self.txt_comment.delete("1.0", "end")
+                self.txt_comment.insert("1.0", self.placeholder_text)
+                self.placeholder_active = True
+        self.txt_comment.bind("<FocusIn>", on_focus_in)
+        self.txt_comment.bind("<FocusOut>", on_focus_out)
+
+        ctk.CTkButton(self, text="Submit", fg_color="#132A13", command=self.submit).pack(pady=10)
+
+    def submit(self):
+        logger = logging.getLogger(__name__)
+        logging.basicConfig(level=logging.INFO)
+        rating = int(self.rating)
+        if rating not in {1,2,3}:
+            messagebox.showerror("Error", "Rating harus 1, 2, atau 3")
+            return
+        comment = self.txt_comment.get("1.0", "end").strip()
+        if self.placeholder_active or comment == self.placeholder_text:
+            comment = ""
+        # Duplicate check dihapus: feedback diperbolehkan per request.
+        logger.info("feedback_submit_start receiver_id=%s provider_id=%s request_id=%s rating=%s", self.receiver_id, self.provider_id, self.request_obj.idRequest, rating)
+        res = FeedbackController.kirimFeedback(self.provider_id, self.receiver_id, rating, comment)
+        if res.get("status") == "SUCCESS":
+            from src.controller.request_controller import RequestController
+            upd = RequestController.updateStatus(self.request_obj.idRequest, "FeedbackSent")
+            if upd.get("status") == "SUCCESS":
+                logger.info("feedback_submit_success receiver_id=%s provider_id=%s request_id=%s status=FeedbackSent", self.receiver_id, self.provider_id, self.request_obj.idRequest)
+                messagebox.showinfo("Sukses", "Feedback berhasil dikirim!")
+            else:
+                logger.error("feedback_status_update_failed receiver_id=%s provider_id=%s request_id=%s error=%s", self.receiver_id, self.provider_id, self.request_obj.idRequest, upd.get("message"))
+                messagebox.showwarning("Tersimpan", "Feedback tersimpan, namun gagal mengubah status request.")
+            self.destroy()
+        else:
+            logger.error("feedback_submit_failed receiver_id=%s provider_id=%s request_id=%s error=%s", self.receiver_id, self.provider_id, self.request_obj.idRequest, res.get("message"))
+            messagebox.showerror("Error", res.get("message", "Gagal mengirim feedback"))
 
     def do_request(self, idDonasi):
         if messagebox.askyesno("Confirm", "Request this food?"):

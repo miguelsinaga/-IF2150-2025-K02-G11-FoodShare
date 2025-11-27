@@ -54,3 +54,14 @@ class DonaturRepo:
         conn.commit()
         cur.close()
         conn.close()
+
+    def update_status(self, user_id: int, status: str):
+        self.ensure_table()
+        conn = get_connection()
+        if conn is None:
+            return
+        cur = conn.cursor()
+        cur.execute("UPDATE donatur SET status_akun=%s WHERE id_user=%s", (status, user_id))
+        conn.commit()
+        cur.close()
+        conn.close()

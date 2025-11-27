@@ -50,11 +50,22 @@ class Feedback:
         self.update()
 
     def ubahRating(self, ratingBaru: int):
-        self.rating = int(ratingBaru)
+        r = int(ratingBaru)
+        if r < 1:
+            r = 1
+        if r > 3:
+            r = 3
+        self.rating = r
         self.update()
 
     def tampilkanFeedback(self) -> str:
-        return f"Provider #{self.idProvider} Rating {self.rating} {self.komentar}"
+        try:
+            from src.model.user import Pengguna
+            p = Pengguna.find_by_id(self.idProvider)
+            pname = p.nama if p else f"Provider #{self.idProvider}"
+        except Exception:
+            pname = f"Provider #{self.idProvider}"
+        return f"{pname} Rating {self.rating} {self.komentar}"
 
     def getRating(self) -> int:
         return self.rating
